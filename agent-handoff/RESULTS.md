@@ -2,7 +2,7 @@
 
 ## Summary
 
-All milestones are done (M0–M6 plus the M7 stretch), committed and pushed to `users/euvinkeel/headless-luau`. Nothing ran on Roblox: no Open Cloud, per the ground rules. Decisions I deferred are in `QUESTIONS.md`.
+All milestones are done (M0–M6 plus the M7 stretch), committed and pushed to `users/euvinkeel/headless-luau`. Nothing ran on Roblox: no Open Cloud, per the ground rules. Decisions I deferred are in `QUESTIONS.md`, with the owner's answers at the top. After the night, M4 was reworked to match those answers (see "M4 follow-up").
 
 **What you can run now:**
 
@@ -39,10 +39,10 @@ The M5 target specs (attributeutils, instanceutils, tie, steputils, and the prom
 - **M2.** Stack and hooks specs. The core path is green with no source changes.
 - **M3.** The Rx/Promise family is green. One source fix: Promise fetches HttpService lazily.
 - **M4.** `experiments/statuh-scope/`:
-  - Design comparison, typed API stubs (13 must-fail lines), and a prototype.
-  - 14 tests, and a 6,000-seed soak with 0 failures.
-  - Benchmark: ~3.5 ms/frame at 50 players × 2,000 entities.
-  - Six prototype bugs and two jecs bugs found by fuzzing. The jecs repros are in `experiments/jecs-findings/`.
+  - Design comparison, typed API stubs (15 must-fail lines), and a prototype. Reworked after the owner's answers: scope is permission only, VisibleThrough names an entity, and components can be narrower than their entity.
+  - 20 tests, and a 6,000-seed soak with 0 failures.
+  - Benchmark: ~3.7 ms/frame at 50 players × 2,000 entities.
+  - Six prototype bugs and four jecs bugs found by fuzzing, one of the jecs bugs with its cause and a tested one-line fix. The jecs repros are in `experiments/jecs-findings/`.
 - **M5.** The `datamodel` level, built on Lune's reflection database plus the luau-lsp definitions, with unique EnumItems and frame-aligned waits. It also turned up four runner bugs that affected every level: `toBe` semantics, `tick()` resolution, yielding requires, and concurrent requires.
 - **M6.** The common hooks are split into a pure pack, a Roblox pack and a facade. The merge is flat and keeps `debug.info(3)` keying, which a spec verifies; it fails if a hook gets wrapped.
 - **M7.** Portability lint with a baseline.
@@ -62,7 +62,7 @@ The M5 target specs (attributeutils, instanceutils, tie, steputils, and the prom
 
 **Start here in the morning:**
 - This summary.
-- `QUESTIONS.md`: M4's VisibleThrough cycles and relevance monotonicity need your call.
+- `QUESTIONS.md`: your answers are recorded at the top. M4's remaining questions are in DESIGN.md, "Open questions".
 - `experiments/statuh-scope/DESIGN.md`.
 - `tools/lune-headless/README.md`, "The datamodel level", for its fidelity compromises.
 
@@ -225,6 +225,8 @@ Reproduce: `lune run tools/lune-headless/run.luau src/rx src/brio src/promise sr
 
 ## M4. Selective replication for Statuh: design and code-UX prototype
 
+*This section is the record of the night. The design changed after the owner's answers; "M4 follow-up" at the end of the section says what changed, and DESIGN.md describes the current design.*
+
 **Done.** Everything is in `experiments/statuh-scope/`; nothing Statuh-related is in `src/`. **Read `experiments/statuh-scope/DESIGN.md` first**: the designs, scoring, choice, semantics, typing, tests, costs and open questions are all there. In short:
 
 - **Designs.** Three were written out for all three games (tower defense with teams and private inventories, RTS with fog of war, instanced dungeons with parties and spectators) and scored against all 17 guardrails:
@@ -264,6 +266,22 @@ lune run experiments/statuh-scope/tools/soak.luau 1 3000 60 && lune run experime
 lune run experiments/statuh-scope/types/check.luau
 lune run experiments/statuh-scope/bench/bench.luau
 ```
+
+### M4 follow-up: the owner's answers
+
+The owner answered the M4 questions (`QUESTIONS.md`, "Owner's answers"). What changed in `experiments/statuh-scope/`, with DESIGN.md rewritten to match:
+
+- **VisibleThrough names an entity:** `pair(Net.VisibleThrough, target)`. The chain is walked until it reaches an entity already visited, with no hop limit. Game relations (`ChildOf`, Held, OwnedBy) mean nothing to visibility, and a replicated relation is data only.
+- **Scope is permission only.** The `relevance` rule mode and hysteresis are gone. A camera is an ordinary `restrict` rule, and lingering is game code (the RTS scenario keeps old cells in its keys). "Removing a constraint never widens" now holds for all of scope.
+- **Components can be narrower than their entity.** A component's visibility is `"all"`, `"owner"`, or a restrict rule. A component that stops being visible but still exists gets HIDE, distinct from REM. In the new arena scenario, the owner's example, a far-away player arrives as a name and a team without Position and Animation.
+- **Tests.** 18 scenario tests (5 new for the arena) plus the 2 fuzz tests, 20 in all. Invariant 6 now also checks HIDE vs REM. The fuzz retargets VisibleThrough links, closes them into loops, and has a component visible only through a rule. Breaking the core on purpose (REM instead of HIDE, or not re-keying entities when a viewer's keys grow) fails both the scenarios and the fuzz. Soak: 3,000 + 3,000 seeds × 60 frames, 0 failures.
+- **Types.** `Statuh.rule(name)` names a rule for a component's visibility, `Net.visibleThrough` replaces `Net.follow`, and there's a new Arena example. The check prints `types OK: 5 files type-check, 15 must-fail lines all fail`.
+- **Cost.** With the camera as a restrict rule, panning is 2.8 ms per frame and teleporting 12.6 ms. Sending positions only to nearby cameras (component visibility, every entity still delivered) costs 4.7 ms per frame, against 3.7 ms without it, and doubles the join frame (516 ms vs 268 ms).
+- **jecs.** The fuzz found a third delete bug, and this time its cause:
+  - Deleting an entity can corrupt another entity that survives the delete. That happens when the survivor holds a pair to the deleted entity and anything ever held both a `ChildOf` pair and another pair to it, which is the normal shape of attached items.
+  - `world_delete` skips clearing a shared table when it `continue`s past a ChildOf archetype. Adding `table.clear(to_remove)` before that `continue` fixes it on a scratch copy; the vendored jecs is unchanged.
+  - A jecs-only search also found a crash in cascade deletes.
+  - Each bug has a minimal repro in `experiments/jecs-findings/` (four in all), and the fuzz now detaches pairs into the deleted set before every delete.
 
 ## M5. Fake DataModel with events: `--level=datamodel`
 
