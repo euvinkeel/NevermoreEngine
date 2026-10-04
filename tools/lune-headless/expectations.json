@@ -8,6 +8,7 @@
 		"src/immediateutils/src/Shared/scheduler/ImmediateScheduler.spec.lua",
 		"src/jecs/src/Shared/Immediate/core/JecsImmediateStack.spec.lua",
 		"src/jecs/src/Shared/Immediate/hooks/JecsImmediateHooksCommonHooks.spec.lua",
+		"src/jecs/src/Shared/Immediate/hooks/JecsImmediateHooksCoreHooks.spec.lua",
 		"src/maid/src/Shared/MaidTaskUtils.spec.lua",
 		"src/nevermore-test-runner/src/Server/NevermoreTestResults.spec.lua",
 		"src/promise/src/Shared/Promise.spec.lua",

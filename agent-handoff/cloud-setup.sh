@@ -36,13 +36,15 @@ fetch_zip stylua "https://github.com/JohnnyMorganz/StyLua/releases/download/v2.3
 fetch_zip selene "https://github.com/Kampfkarren/selene/releases/download/0.29.0/selene-0.29.0-linux.zip"
 fetch_zip luau-lsp "https://github.com/Quenty/luau-lsp/releases/download/1.58.0-quenty.1/luau-lsp-linux-x86_64.zip"
 fetch_zip rojo "https://github.com/quenty/rojo/releases/download/v7.7.0-rc.3-quenty/rojo-7.7.0-rc.3-quenty-linux-x86_64.zip"
+# aftman.toml says UpliftGames/moonwave; the releases are served from evaera/moonwave.
+fetch_zip moonwave-extractor "https://github.com/evaera/moonwave/releases/download/v1.3.0/moonwave-extractor-v1.3.0-linux.zip"
 export PATH="$BIN:$PATH"
 for t in lune rojo stylua selene luau-lsp; do printf '%-9s %s\n' "$t" "$("$t" --version 2>&1 | head -1)"; done
 
 # The repo's Claude hooks (.claude/hooks) run stylua and `npm run lint:luau` with the default PATH,
 # so expose the tools there when we can.
 if [[ -w /usr/local/bin ]]; then
-	for t in lune rojo stylua selene luau-lsp; do ln -sf "$BIN/$t" "/usr/local/bin/$t"; done
+	for t in lune rojo stylua selene luau-lsp moonwave-extractor; do ln -sf "$BIN/$t" "/usr/local/bin/$t"; done
 fi
 
 # `lune setup` writes typedefs to ~/.lune/.typedefs and also adds an alias to .luaurc in the

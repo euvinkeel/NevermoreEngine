@@ -137,6 +137,7 @@
 		"src/instanceutils/src/Shared/RxInstanceUtils.spec.lua",
 		"src/jecs/src/Shared/Immediate/core/JecsImmediateStack.spec.lua",
 		"src/jecs/src/Shared/Immediate/hooks/JecsImmediateHooksCommonHooks.spec.lua",
+		"src/jecs/src/Shared/Immediate/hooks/JecsImmediateHooksCoreHooks.spec.lua",
 		"src/jest-utils/src/Shared/JestUtils.spec.lua",
 		"src/lipsum/src/Shared/LipsumUtils.spec.lua",
 		"src/maid/src/Shared/MaidTaskUtils.spec.lua",
