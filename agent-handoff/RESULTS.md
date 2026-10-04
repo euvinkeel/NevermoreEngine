@@ -200,3 +200,91 @@ lune run experiments/statuh-scope/tools/soak.luau 1 3000 60 && lune run experime
 lune run experiments/statuh-scope/types/check.luau
 lune run experiments/statuh-scope/bench/bench.luau
 ```
+
+## M5. Fake DataModel with events: `--level=datamodel`
+
+**What was built.** A fourth host level whose Instances have events. Files, all in `tools/lune-headless/lib/`:
+- `FakeDataModel.luau`: Instances, signals, services, frame stepping.
+- `RobloxApi.luau`: event and method names from the luau-lsp definitions.
+- `EnumShim.luau`: unique EnumItems.
+
+Also changed: `Host.luau`, `Scheduler.luau` (frame-aligned waits), `RobloxPure.luau` (DateTime formatting).
+
+Classes, services, creatability, property types and defaults come from Lune's bundled rbx-dom reflection database rather than a hand-written list. Event and method names come from `globalTypes.d.lua`, the file `npm run lint:luau` downloads. So the fake knows all ~900 classes, and an unemulated engine member fails with an explicit `[lune-headless] ... is not emulated` instead of a misleading "not a valid member".
+
+Defaults follow the "What a test place can drive" table in `docs/testing/testing.md`:
+- server, not running, immediate signals;
+- Heartbeat at ~60 Hz, Stepped silent;
+- RenderStepped throws on a server, and BindToRenderStep is silent.
+
+Flags change the context: `--realm=client`, `--running`, `--studio`, `--signals=deferred`. The full emulated surface and every fidelity compromise are in the README, under "The datamodel level". `npm run test:lune:datamodel` gates the whole repo against `expectations.datamodel.json`.
+
+**Target specs, before and after** (tests passed / total):
+
+| Spec | `basic` | `roblox` | `datamodel` |
+|---|---|---|---|
+| attributeutils / AttributeUtils.spec.lua | 2/15 | 12/15 | 15/15 |
+| attributeutils / AttributeValue.spec.lua | 1/19 | 12/19 | 19/19 |
+| attributeutils / EncodedAttributeValue.spec.lua | 0/19 | 12/19 | 19/19 |
+| attributeutils / JSONAttributeValue.spec.lua | 0/10 | 8/10 | 10/10 |
+| attributeutils / RxAttributeUtils.spec.lua | 1/12 | 1/12 | 12/12 |
+| instanceutils / RxInstanceUtils.spec.lua | 0/15 | 0/15 | 15/15 |
+| tie / TiePropertyInterface.spec.lua | 0/30 | 5/30 | 30/30 |
+| tie / TieRealmService.spec.lua | 4/5 | 4/5 | 5/5 |
+| tie / TieDefinition.spec.lua | 0/8 | 0/8 | 8/8 |
+| tie / TieImplementation.spec.lua | 0/8 | 1/8 | 8/8 |
+| tie / TieInterface.spec.lua | 0/16 | 9/16 | 16/16 |
+| tie / TieUtils.spec.lua | 5/5 | 5/5 | 5/5 |
+| steputils / StepUtils.spec.lua | 4/35 | 6/35 | 35/35 |
+| steputils / onRenderStepFrame.spec.lua | 2/5 | 2/5 | 5/5 |
+| steputils / onSteppedFrame.spec.lua | 1/4 | 1/4 | 4/4 |
+| promise / Promise.spec.lua | 63/63 | 63/63 | 63/63 |
+| promise / PromiseRetryUtils.spec.lua | 5/5 | 5/5 | 5/5 |
+| promise / PromiseTestUtils.spec.lua | 9/9 | 9/9 | 9/9 |
+| promise / PromiseUtils.spec.lua | 27/27 | 27/27 | 27/27 |
+| promise / PendingPromiseTracker.spec.lua | 6/6 | 6/6 | 6/6 |
+| promise / PromiseInstanceUtils.spec.lua | 0/2 | 0/2 | 2/2 |
+| promise / promiseChild.spec.lua | 0/3 | 1/3 | 3/3 |
+| promise / promisePropertyValue.spec.lua | 0/2 | 1/2 | 2/2 |
+| promise / promiseWait.spec.lua | 2/2 | 2/2 | 2/2 |
+| **Total (24 specs)** | **132/325** | **192/325** | **325/325** |
+
+valuebaseutils has no specs. The promise rows are the instance-based utilities from M3.
+
+**Signal timing matters, and immediate is right.** With `--signals=deferred`, the same 24 specs drop to 295/325 (9 specs fail). They assert right after a write, which matches the "handlers run before the next line" row in testing.md.
+
+**Whole repo** (315 specs):
+
+| Level | Specs passing | Load errors | Tests passing |
+|---|---|---|---|
+| `basic` | 87 | 161 | 1,634 |
+| `roblox` | 125 | 25 | 2,503 |
+| `datamodel` | **282** | 1 | **4,440** of 4,750 |
+
+The default closure (`npm run test:lune`) at `datamodel` passes 39 of its 40 specs. The exception is ImmediateHotReloadInstall (harness gap, below). `npm run test:lune` itself stays on `basic`.
+
+**Every remaining failure, classified** (33 specs; the per-spec reason is in `expectations.datamodel.json`):
+
+| Class | Specs | What |
+|---|---|---|
+| Emulation gap | 20 | `Model:GetBoundingBox` (4); LocalizationTable/Translator (6, clienttranslator); `BasePart:GetMass`/`GetConnectedParts` (2); R6 rig joints/constraints (2, ragdoll); non-English DateTime locales (2); SecurityCapabilities (2, brine); TeleportOptions (1); `Humanoid:UnequipTools` (1) |
+| Needs the real engine | 6 | Avatar loading through `Players:CreateHumanoidModelFromDescription` (PlayerMock, characterutils, resetservice ×2, playerutils); DataStoreService (1) |
+| Harness gap | 3 | Package source folders are FS nodes rather than Instances in the fake DataModel, so TemplateProvider and hot reload can't clone them (2); Lune's enum data lacks `Enum.KeyCode.None` (1) |
+| Slow | 2 | Pass with `--test-timeout=30` (EllipticCurveCryptography, a datastore removal-callback test) |
+| Spec bug | 1 | `GameVersionUtils.spec.lua` "says unknown when a deploy did not record its target" passes `{ target = nil }` as overrides. That table has no keys, so the override does nothing and the test fails on Roblox too. Not fixed (out of scope); noted in QUESTIONS. |
+| Out of scope | 1 | `HttpService:RequestAsync` (network) |
+
+**Runner bugs found and fixed along the way.** These affect every level:
+- `toBe` used `rawequal`; jest-lua's `Object.is` uses `==`. EnumItems and datatypes now compare like they do in jest-lua.
+- `tick()` had millisecond resolution because it came from `DateTime.now()`. Roblox's is much finer. This was the cause of the M1 "flaky" ScoredActionPicker tie-break test, which orders actions by creation `tick()`.
+- A require could yield: lazy file reads for packages outside the declared closure, and third-party packages. ServiceBag rejects a yielding `Init`. The snapshot now pre-reads every package that a `require("Name")` literal resolves to.
+- A second thread requiring a module that was mid-load raised "required recursively". Roblox makes it wait, and now so does the runner.
+
+**Why lune-test wasn't vendored:** see QUESTIONS.md, M5.
+
+Reproduce:
+```bash
+npm run test:lune:datamodel                      # whole repo vs expectations.datamodel.json (~70 s)
+lune run tools/lune-headless/run.luau src/attributeutils src/instanceutils src/tie src/steputils src/promise --level=datamodel
+lune run tools/lune-headless/run.luau src/attributeutils src/instanceutils src/tie src/steputils src/promise --level=basic   # "before"
+```
