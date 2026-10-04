@@ -1,6 +1,70 @@
 # Results: headless Luau tests
 
-<!-- SUMMARY: filled in at the end of the night -->
+## Summary
+
+All milestones are done (M0–M6 plus the M7 stretch), committed and pushed to `users/euvinkeel/headless-luau`. Nothing ran on Roblox: no Open Cloud, per the ground rules. Decisions I deferred are in `QUESTIONS.md`.
+
+**What you can run now:**
+
+| Command | What it checks | Result |
+|---|---|---|
+| `npm run test:lune` | immediateutils/jecs/iris closure at `basic` | 21 must-pass specs green |
+| `npm run test:lune:datamodel` | all 316 specs on the fake DataModel | 283 must pass, 33 known failures with reasons; ~70 s |
+| `npm run test:lune:selftest` | the runner's own semantics | 19 outcomes |
+| `npm run lint:portability` | Roblox-only API in the engine-free closure | 0 import-time uses |
+| `lune run experiments/statuh-scope/tools/soak.luau 1 3000 60` | Statuh scope fuzz | 0 failures |
+
+**Headline numbers.** All 316 specs, including M6's new spec:
+
+| Level | Specs passing | Tests passing |
+|---|---|---|
+| `basic` | 88 | 1,651 |
+| `roblox` (Lune Instances) | 126 | 2,520 |
+| `datamodel` (M5) | **283** | **4,457** of 4,767 |
+
+The M5 target specs (attributeutils, instanceutils, tie, steputils, and the promise Instance utilities) went from 132/325 tests at `basic` to 325/325. Every remaining failure is classified in `tools/lune-headless/expectations.datamodel.json`:
+
+| Class | Specs |
+|---|---|
+| Emulation gap | 20 |
+| Needs the real engine | 6 |
+| Harness gap | 3 |
+| Slow | 2 |
+| Spec bug | 1 |
+| Out of scope | 1 |
+
+**Per milestone:**
+- **M0.** `agent-handoff/cloud-setup.sh` rebuilds the toolchain in a fresh container (proxy workarounds included). The baseline `lint:luau` is 0.
+- **M1.** `tools/lune-headless`: a per-spec-process runner with a jest-lua-compatible mini-jest. It covers fake timers, async tests (the yield-then-fail case now fails correctly), per-test timeouts, stray errors, and Nevermore module resolution.
+- **M2.** Stack and hooks specs. The core path is green with no source changes.
+- **M3.** The Rx/Promise family is green. One source fix: Promise fetches HttpService lazily.
+- **M4.** `experiments/statuh-scope/`:
+  - Design comparison, typed API stubs (13 must-fail lines), and a prototype.
+  - 14 tests, and a 6,000-seed soak with 0 failures.
+  - Benchmark: ~3.5 ms/frame at 50 players × 2,000 entities.
+  - Six prototype bugs and two jecs bugs found by fuzzing. The jecs repros are in `experiments/jecs-findings/`.
+- **M5.** The `datamodel` level, built on Lune's reflection database plus the luau-lsp definitions, with unique EnumItems and frame-aligned waits. It also turned up four runner bugs that affected every level: `toBe` semantics, `tick()` resolution, yielding requires, and concurrent requires.
+- **M6.** The common hooks are split into a pure pack, a Roblox pack and a facade. The merge is flat and keeps `debug.info(3)` keying, which a spec verifies; it fails if a hook gets wrapped.
+- **M7.** Portability lint with a baseline.
+
+**Every Nevermore source change** (`src/`; each in its own commit):
+
+| Commit | Change | Risk on Roblox |
+|---|---|---|
+| `a96fa1e` fix(promise) | `Promise.lua` fetches HttpService on first use (inside the existing pcall) instead of at require | Very low: same service, same call, one nil check per error formatting. |
+| `11f123c` refactor(jecs) | `JecsImmediateHooksCommonHooks` becomes a facade over the new `JecsImmediateHooksCoreHooks` and `JecsImmediateHooksRobloxHooks`; the hook code moved verbatim | Low: same 37 functions, a flat merge, an unchanged call path. New module names could collide with game code that defines the same names (none in this repo). |
+| `28344d3`, `7f6ebd6`, `7db271d`, `f8e431c` test | New specs: `ImmediateStack`, `JecsImmediateStack`, `JecsImmediateHooksCommonHooks` (+2 facade tests), `JecsImmediateHooksCoreHooks` | Tests only. They'll run in `nevermore test --cloud` for these packages but were never run on Roblox. |
+
+**Not verified:**
+- Nothing ran on Roblox or in the cloud, so the new specs and the M6 split are verified headlessly only. `lint:luau`, selene, stylua and moonwave are clean.
+- The datamodel level's choice of immediate signals is based on `docs/testing/testing.md`, not on a run.
+- `legacy-reference/` is local only and was never committed.
+
+**Start here in the morning:**
+- This summary.
+- `QUESTIONS.md`: M4's VisibleThrough cycles and relevance monotonicity need your call.
+- `experiments/statuh-scope/DESIGN.md`.
+- `tools/lune-headless/README.md`, "The datamodel level", for its fidelity compromises.
 
 Branch `users/euvinkeel/headless-luau`, based on Nevermore `main` `de6ba8b`. Machine: Linux x86_64 cloud container (4 cores), Node 22.22, pnpm 10.27.
 
