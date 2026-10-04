@@ -7,7 +7,9 @@
 	@class Promise
 ]=]
 
-local HttpService = game:GetService("HttpService")
+-- Fetched on first use instead of at require time, so Promise can load without a DataModel
+-- (headless tests under Lune). Only _toHumanReadable needs it.
+local HttpService: HttpService? = nil
 
 -- Turns out debug.traceback() is slow
 local ENABLE_TRACEBACK = false
@@ -411,7 +413,10 @@ function Promise._toHumanReadable<T...>(_self: Promise<T...>, data: any): string
 
 		local errOutput
 		local ok = pcall(function()
-			errOutput = HttpService:JSONEncode(data)
+			if HttpService == nil then
+				HttpService = game:GetService("HttpService")
+			end
+			errOutput = (HttpService :: HttpService):JSONEncode(data)
 		end)
 		if not ok then
 			errOutput = tostring(data)
