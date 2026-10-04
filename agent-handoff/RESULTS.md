@@ -99,3 +99,27 @@ Most remaining `roblox` load errors are emulation gaps for M5: RunService member
 
 ### Typing
 `luau-lsp analyze --platform=standard tools/lune-headless/run.luau tools/lune-headless/worker.luau tools/lune-headless/lib tools/lune-headless/selftest/check.luau` reports 0 errors (strict mode, `@lune` resolved through `tools/lune-headless/.luaurc`).
+
+## M2. Core path green with no source changes
+
+**Done.** Everything below passes at `--level=basic` (host polyfills only), with no changes to Nevermore source.
+
+| Spec | Tests | Notes |
+|---|---|---|
+| `src/immediateutils/.../scheduler/ImmediateScheduler.spec.lua` (existing) | 3/3 | |
+| `src/servicebag/.../ServiceBag.spec.lua` (existing) | 13/13 | |
+| `src/maid/.../MaidTaskUtils.spec.lua` (existing) | 5/5 | |
+| **new** `src/immediateutils/src/Shared/core/ImmediateStack.spec.lua` | 10/10 | `ImmediateInstall.stack3` ordering; Tick slot topology (preTick → (preSystem → system → postSystem)* → postTick, priority then name); extra Tick args; `previousSystem`/`previousRawSystem`; protected errors logged in `rt.errorlog`; DEBUG yield detection; `ImmediateDeferInstall` (flush after each system, nested defers, no double fire); `rt.Destroy`. |
+| **new** `src/jecs/src/Shared/Immediate/core/JecsImmediateStack.spec.lua` | 6/6 | The probe's full stack (`stack3` + `JecsImmediateInstall` + `JecsImmediateHooksInstall` + `ImmediateDeferInstall` + common hooks + real jecs), plus: pre-world `Jecs.component()` ids passed through `comps`, per-iteration hook state, hook GC running the hook maid, `rt.defer` for structural changes during a query, `rt.Destroy` cleaning the world and hook maids. |
+| **new** `src/jecs/src/Shared/Immediate/hooks/JecsImmediateHooksCommonHooks.spec.lua` | 12/12 | `hooks.cache` (once per call site, multiple returns, discriminators, cleanup with the cached values), `throttle` (window by `os.clock()` under fake timers, `delayOnFirstCall`, keeps its window through unused ticks, then is cleaned up), `changed` (`runFirst`, `onlyOnEqualTo`), `state`, `gate` (once per call site, reopens after cleanup). All under `jest.useFakeTimers()`. |
+
+Reproduce: `npm run test:lune` (the closure now has 40 specs, 20 green, 304 tests passing in 2.3 s) or `lune run tools/lune-headless/run.luau src/jecs src/immediateutils`.
+
+`npm run lint:luau` is still 0 errors with the new specs. `npm run lint:stylua` is clean, and selene is clean on both packages (`cd src/<pkg> && selene --no-summary --num-threads=1 --config=../../selene.toml src`). Generating selene's `roblox.yml` needed a selene built with system certificates (`cloud-setup.sh --selene-std`), because the stock binary rejects the cloud proxy's certificate.
+
+Behaviors the new specs pin down (worth knowing):
+- **The scheduler's error-log key includes the full traceback,** so the same error reached from two different `Tick` call sites is counted under two keys. A game ticks from one place, so this doesn't matter in practice, but the spec ticks from a loop for that reason.
+- **Hook GC timing:** a hook that isn't called during a tick is deleted at the end of that tick, because the previous tick's GC already flagged it. `throttle` keeps its state through unused ticks until its window has passed.
+- **`hooks.maid`'s callback runs during cleanup evaluation,** not at creation. Add tasks to the maid it returns.
+
+**Not verified on Roblox:** the three new specs ran only under Lune. I wrote them against APIs that behave the same in jest-lua, and fake timers reach hook modules on Roblox the same way: Nevermore's loader requires through the `require` in its own environment, which is jest-runtime's when a spec loads it, and that's how `ThrottledFunction.spec` already works. Running `nevermore test` for `immediateutils` and `jecs` would confirm.

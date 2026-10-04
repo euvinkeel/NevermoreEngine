@@ -2,6 +2,7 @@
 # Reproduces the M0 toolchain in a Linux cloud session (no aftman, no GitHub API).
 #
 #   bash agent-handoff/cloud-setup.sh            # tools + pnpm install + tool build + sourcemap
+#   bash agent-handoff/cloud-setup.sh --selene-std   # also generate roblox.yml for selene
 #   export PATH="$HOME/.nevermore-headless/bin:$PATH"
 #
 # Why it exists:
@@ -78,4 +79,18 @@ pnpm -r --filter './tools/**' --filter '!./tools/nevermore-vscode' run build
 # Reinstalling over an existing global link fails inside npm ("reading 'package'"), so skip it.
 command -v nevermore >/dev/null || (cd tools/nevermore-cli && npm install --ignore-scripts -g . >/dev/null)
 npm run build:sourcemap
+
+# `npm run lint:selene` needs roblox.yml from `selene generate-roblox-std`, which downloads the API
+# dump with its own bundled CA roots and so rejects the proxy's certificate. With --selene-std, build
+# selene 0.29.0 from crates.io with ureq's native-certs feature (about 1.5 min) just to generate it.
+if [[ " $* " == *" --selene-std "* && ! -f roblox.yml ]]; then
+	SRC="$TOOLS_DIR/selene-src"
+	mkdir -p "$SRC"
+	curl -fsSL -o "$SRC/selene.crate" https://crates.io/api/v1/crates/selene/0.29.0/download
+	tar xzf "$SRC/selene.crate" -C "$SRC"
+	sed -i '/\[dependencies.ureq\]/,/^optional/ s/features = \["json"\]/features = ["json", "native-certs"]/' "$SRC/selene-0.29.0/Cargo.toml"
+	(cd "$SRC/selene-0.29.0" && cargo build --release)
+	"$SRC/selene-0.29.0/target/release/selene" generate-roblox-std
+fi
+
 echo "Done. Next: export PATH=\"$BIN:\$PATH\" && npm run lint:luau"
