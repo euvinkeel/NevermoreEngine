@@ -14,3 +14,6 @@ Each entry names the conservative choice I made so work could continue.
 
 ## M2
 - **Where the full-stack spec lives.** The handoff said "next to immediateutils' other specs", but the full stack needs `JecsImmediateInstall`, `JecsImmediateHooksInstall` and the common hooks, which live in `src/jecs`. jecs depends on immediateutils, not the other way round, so a spec inside immediateutils couldn't resolve them on Roblox. *Choice:* `ImmediateStack.spec.lua` in immediateutils covers the immediateutils-only stack (installers, scheduler, defer), and `JecsImmediateStack.spec.lua` plus `JecsImmediateHooksCommonHooks.spec.lua` live in `src/jecs/src/Shared/Immediate/`. Move them if you prefer another layout.
+
+## M3
+- **canceltoken and cancellabledelay have no specs.** *Choice:* I didn't add any, since they would be new source that's unverified on Roblox. Both are small and sit under the netcode path (cancellation, timers), so they're good candidates for specs later.

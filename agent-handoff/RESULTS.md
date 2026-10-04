@@ -123,3 +123,38 @@ Behaviors the new specs pin down (worth knowing):
 - **`hooks.maid`'s callback runs during cleanup evaluation,** not at creation. Add tasks to the maid it returns.
 
 **Not verified on Roblox:** the three new specs ran only under Lune. I wrote them against APIs that behave the same in jest-lua, and fake timers reach hook modules on Roblox the same way: Nevermore's loader requires through the `require` in its own environment, which is jest-runtime's when a spec loads it, and that's how `ThrottledFunction.spec` already works. Running `nevermore test` for `immediateutils` and `jecs` would confirm.
+
+## M3. The Rx/Promise family
+
+**Done, except three promise specs that need Instance events (M5).**
+
+| Package | Specs | `basic` before → after | Notes |
+|---|---|---|---|
+| rx | Rx | 3/3 → 3/3 | |
+| brio | BrioUtils, RxBrioUtils | 35/35 → 35/35 | |
+| promise | Promise, PromiseUtils, PromiseRetryUtils, PromiseTestUtils, PendingPromiseTracker, promiseWait | 112/112 → 112/112 | |
+| promise | PromiseInstanceUtils, promiseChild, promisePropertyValue | 0/7 | Need `AncestryChanged`, `ChildAdded`, `GetPropertyChangedSignal`: M5. |
+| throttle | ThrottledFunction | 5/5 → 5/5 | Uses fake timers. |
+| maid | MaidTaskUtils | 5/5 → 5/5 | |
+| canceltoken, cancellabledelay | (no specs) | - | |
+
+At `basic` these already passed in M1, because the host's `game` provides a pure HttpService. The source change is about not needing that shim at all.
+
+### Source change: `src/promise/src/Shared/Promise.lua` (commit `fix(promise): fetch HttpService on first use instead of at require`)
+- **Before:** `local HttpService = game:GetService("HttpService")` ran at require time, so requiring Promise without a DataModel failed. That broke Rx, CancelToken and every module above them.
+- **After:** `HttpService` is fetched and cached inside the existing `pcall` in `_toHumanReadable`, the only place it is used.
+- **Risk on Roblox:** none expected.
+  - The output of `_toHumanReadable` is unchanged: same service, same `JSONEncode`, same `tostring` fallback.
+  - The extra cost is one nil check, only when an uncaught rejection is reported.
+  - `Promise.spec`'s `_toHumanReadable` block (4 tests: strings, custom `__tostring`, `{code=500}` → `{"code":500}`, `{}` → `[]`) passes headlessly against the Roblox-compatible JSON stub.
+- **Checks:** `npm run lint:luau` 0 errors; selene clean on `src/promise`.
+- **Headless effect at `--level=none`** (no `task`, no `game`), closure specs:
+
+  | | Load errors | Passing tests | Green specs |
+  |---|---|---|---|
+  | Before | 28 | 102 | 5 |
+  | After | 16 | 177 | 7 |
+
+  Rx.spec and PendingPromiseTracker.spec go green with no host at all.
+
+Reproduce: `lune run tools/lune-headless/run.luau src/rx src/brio src/promise src/throttle src/maid` (`--level=none` for the before/after; check out `a96fa1e~1 -- src/promise/src/Shared/Promise.lua` for "before").
