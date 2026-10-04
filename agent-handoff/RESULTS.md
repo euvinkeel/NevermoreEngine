@@ -288,3 +288,29 @@ npm run test:lune:datamodel                      # whole repo vs expectations.da
 lune run tools/lune-headless/run.luau src/attributeutils src/instanceutils src/tie src/steputils src/promise --level=datamodel
 lune run tools/lune-headless/run.luau src/attributeutils src/instanceutils src/tie src/steputils src/promise --level=basic   # "before"
 ```
+
+## M6. Common hooks split: pure pack, Roblox pack, facade
+
+Implements the FINDINGS §2 proposal in `src/jecs/src/Shared/Immediate/hooks/` (commit `refactor(jecs): split the common hooks ...`):
+
+| Module | Contents |
+|---|---|
+| `JecsImmediateHooksCoreHooks` | The 31 engine-free hooks plus a `guid` that formats a v4 GUID like `HttpService:GenerateGUID()`. Its require closure has no `game`, Instance, tie, binder or ValueBase code. |
+| `JecsImmediateHooksRobloxHooks` | `filterDescendants`, `findChild`, `useBinder`, `useTieInterface`, `value`, and `guid` from HttpService, moved verbatim. |
+| `JecsImmediateHooksCommonHooks` | Facade: builds the core table, then copies the Roblox pack's entries over it. |
+
+- **Flat merge, no wrappers.** Every facade entry is the pack's own function, so the `debug.info(3, ...)` call-site keying in `getOrCreateHookState` still sees game code, and a call costs the same. The only new cost is one loop over 6 keys per runtime.
+- **`value` went to the Roblox pack.** FINDINGS lists it as "needs polyfills", but `ValueObject` requires ValueBaseUtils and RxValueBaseUtils at import, which would break the pure pack's closure rule. See QUESTIONS.
+- **`spring` and `linearWalk` stay in the pure pack unchanged.** Their CFrame/Color3 branches sit behind `typeof` guards and add nothing to the require closure. Splitting them would have meant duplicating each whole hook, because a Roblox override can't wrap the pure one. See QUESTIONS.
+- **Roblox behavior.** Unchanged: the same 37 hooks with the same code, and `guid` still comes from HttpService. `lint:luau` is 0. selene and stylua are clean on the package, and `moonwave-extractor` passes. Types are unchanged too. A strict probe showed `hooks.gate()` was already `any` to strict consumers before the split, and still is.
+- **Specs** (Lune, also in both gates):
+  - `JecsImmediateHooksCoreHooks.spec.lua`: 15 tests that tick the pure pack on its own with fake timers.
+  - `JecsImmediateHooksCommonHooks.spec.lua`: +2 tests. One checks the facade exposes exactly the union of the two packs. The other checks a Roblox-pack hook stays keyed by the caller's line. I verified that second test catches a wrapper: temporarily wrapping `guid` in the facade made it fail.
+- **Proof the pure pack is engine-free.** The core spec loads at `--level=none`, which has no `game` global. The facade's spec fails to load there, as expected: `JecsImmediateHooksRobloxHooks.lua:15: attempt to index nil with 'GetService'`.
+
+Reproduce:
+```bash
+lune run tools/lune-headless/run.luau src/jecs/src/Shared/Immediate/hooks                       # 3 specs, 35 tests
+lune run tools/lune-headless/run.luau src/jecs/src/Shared/Immediate/hooks/JecsImmediateHooksCoreHooks.spec.lua --level=none  # loads; only the timer-free test passes
+npm run lint:luau
+```
