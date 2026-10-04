@@ -34,6 +34,7 @@
     "test": "npx @quenty/nevermore-cli batch test",
     "test:lune": "lune run tools/lune-headless/run.luau --expect=tools/lune-headless/expectations.json",
     "test:lune:all": "lune run tools/lune-headless/run.luau --all",
+    "test:lune:datamodel": "lune run tools/lune-headless/run.luau --all --level=datamodel --expect=tools/lune-headless/expectations.datamodel.json",
     "test:lune:selftest": "lune run tools/lune-headless/selftest/check.luau",
     "test:ts": "pnpm -r --filter \"./tools/**\" --filter \"!./tools/nevermore-vscode\" --if-present run test",
     "release": "auto shipit",

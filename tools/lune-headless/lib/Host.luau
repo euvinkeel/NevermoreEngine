@@ -5,7 +5,8 @@
 	- none:   nothing beyond Lune's own globals (plus `script`/`require` from the loader).
 	- basic:  task, os, tick/time/wait/delay/spawn, a debug proxy with the Roblox profiling and
 	          memory-category functions, warn/print capture, Random, DateTime, TweenInfo, shared,
-	          and a `game` whose only working service is a pure HttpService.
+	          a `typeof` that knows DateTime, and a `game` whose only working service is a pure
+	          HttpService.
 	- roblox: basic + @lune/roblox Instances and datatypes (Vector3, CFrame, Enum, ...). Lune's
 	          Instances have no events, so this level only helps code that reads instance trees.
 	- datamodel: basic + @lune/roblox datatypes and Enum, with Instances, `game`, `workspace` and
@@ -14,6 +15,7 @@
 	          a Nevermore test place: server, not running, not Studio, immediate signals.
 ]]
 
+local EnumShim = require("./EnumShim")
 local FakeDataModel = require("./FakeDataModel")
 local RobloxApi = require("./RobloxApi")
 local RobloxPure = require("./RobloxPure")
@@ -166,6 +168,9 @@ function Host.build(options: Options): { [string]: any }
 	end)
 	globals.TweenInfo = RobloxPure.TweenInfo
 	globals.shared = {}
+	globals.typeof = function(value: any): string
+		return RobloxPure.typeName(value) or typeof(value)
+	end
 
 	local services: { [string]: any } = {
 		HttpService = RobloxPure.HttpService,
@@ -224,6 +229,24 @@ function Host.build(options: Options): { [string]: any }
 	elseif level == "datamodel" then
 		local dmOptions: DataModelOptions = options.datamodel or {}
 		local isClient = dmOptions.isClient == true
+		local roblox = require("@lune/roblox") :: any
+		local datatypes = installDatatypes(globals)
+		-- Unique EnumItems (see EnumShim), converted where they cross into Lune datatypes.
+		local enumShim = EnumShim.new(roblox.Enum)
+		datatypes.Enum = enumShim.Enum
+		local enumTakers: { [string]: { string } } = {
+			Axes = { "new" },
+			Faces = { "new" },
+			Font = { "new", "fromEnum", "fromName", "fromId" },
+			PhysicalProperties = { "new" },
+			Vector3 = { "FromNormalId", "FromAxis" },
+		}
+		for name, functions in enumTakers do
+			datatypes[name] = enumShim.wrapFunctions(datatypes[name], functions)
+		end
+		for name, value in datatypes do
+			globals[name] = value
+		end
 		local dm = FakeDataModel.new({
 			scheduler = scheduler,
 			signalMode = dmOptions.signalMode or "immediate",
@@ -231,8 +254,9 @@ function Host.build(options: Options): { [string]: any }
 			isServer = not isClient,
 			isStudio = dmOptions.isStudio == true,
 			isRunning = dmOptions.isRunning == true,
-			datatypes = installDatatypes(globals),
-			reflection = (require("@lune/roblox") :: any).getReflectionDatabase(),
+			datatypes = datatypes,
+			enumShim = enumShim,
+			reflection = roblox.getReflectionDatabase(),
 			api = if dmOptions.apiPath then RobloxApi.load(dmOptions.apiPath) else nil,
 			onStrayError = options.onStrayError,
 		})

@@ -10,6 +10,10 @@
 
 local Expect = {}
 
+-- The spec's `typeof` (the datamodel host level overrides it so fake Instances are "Instance"),
+-- for matchers that name types, like expect.any("Instance"). Set by the worker.
+Expect.hostTypeof = typeof
+
 local ASYMMETRIC = {} -- metatable marking asymmetric matchers
 local MOCK = {} -- metatable marking mock functions
 
@@ -171,7 +175,7 @@ end
 local function anyMatcher(expected: any): any
 	if type(expected) == "string" then
 		return asymmetric(`Any<{expected}>`, function(v)
-			return type(v) == expected or typeof(v) == expected
+			return type(v) == expected or Expect.hostTypeof(v) == expected
 		end)
 	end
 	return asymmetric("Any<class>", function(v)

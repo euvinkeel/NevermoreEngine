@@ -24,6 +24,7 @@
 	Fidelity compromises are listed in tools/lune-headless/README.md ("datamodel level").
 ]]
 
+local EnumShim = require("./EnumShim")
 local RobloxApi = require("./RobloxApi")
 local RobloxPure = require("./RobloxPure")
 local Scheduler = require("./Scheduler")
@@ -47,6 +48,8 @@ export type Config = {
 	reflection: any,
 	-- Event and method names from the luau-lsp definitions, if available (see RobloxApi).
 	api: RobloxApi.Api?,
+	-- When `datatypes.Enum` is an EnumShim, the shim (for typeof and converting Lune EnumItems).
+	enumShim: EnumShim.Shim?,
 	onStrayError: (message: string) -> (),
 }
 
@@ -63,8 +66,13 @@ function FakeDataModel.new(config: Config)
 	-- object -> kind, for typeof()
 	local kinds: { [any]: string } = setmetatable({}, { __mode = "k" }) :: any
 
+	local enumShim = config.enumShim
+	local function fromLune(value: any): any
+		return if enumShim then enumShim.fromLune(value) else value
+	end
+
 	local function typeofValue(value: any): string
-		return kinds[value] or typeof(value)
+		return kinds[value] or (enumShim and enumShim.typeName(value)) or RobloxPure.typeName(value) or typeof(value)
 	end
 
 	-- Signals ----------------------------------------------------------------------------------
@@ -347,16 +355,24 @@ function FakeDataModel.new(config: Config)
 		ScriptContext = { "Error" },
 	}
 
+	-- The Enum by that name, or nil (Lune's and the shim's Enum both throw for unknown names).
+	local function enumNamed(name: string): any
+		local ok, enum = pcall(function()
+			return D.Enum[name]
+		end)
+		return if ok then enum else nil
+	end
+
 	-- A default for a property the database has no default for (most often on NotCreatable classes).
 	local function typeDefault(datatype: string): any
 		if datatype == "Bool" then
 			return false
 		elseif datatype == "Float32" or datatype == "Float64" or datatype == "Int32" or datatype == "Int64" then
 			return 0
-		elseif datatype == "String" or datatype == "Content" or datatype == "ContentId" then
+		elseif datatype == "String" or datatype == "ContentId" then
 			return ""
 		elseif string.sub(datatype, 1, 5) == "Enum." then
-			local enum = D.Enum[string.sub(datatype, 6)]
+			local enum = enumNamed(string.sub(datatype, 6))
 			return enum and enum:GetEnumItems()[1] or NIL
 		elseif D[datatype] and D[datatype].new and datatype ~= "BrickColor" then
 			local ok, value = pcall(D[datatype].new)
@@ -395,7 +411,12 @@ function FakeDataModel.new(config: Config)
 				and propertyName ~= "Name"
 				and propertyName ~= "Parent"
 			then
+				-- Some defaults are only listed under the serialized name (Humanoid.Health_XML).
 				local default = defaults[propertyName]
+				if default == nil then
+					default = defaults[propertyName .. "_XML"]
+				end
+				default = fromLune(default)
 				info.properties[propertyName] = {
 					datatype = property.Datatype,
 					readOnly = scriptability == "Read",
@@ -507,7 +528,7 @@ function FakeDataModel.new(config: Config)
 				bad("bool")
 			end
 			return value
-		elseif datatype == "String" or datatype == "Content" or datatype == "ContentId" then
+		elseif datatype == "String" or datatype == "ContentId" then
 			if type(value) == "number" then
 				return tostring(value)
 			elseif type(value) ~= "string" then
@@ -522,8 +543,12 @@ function FakeDataModel.new(config: Config)
 			return if datatype == "Float32" then float32(number) else number
 		elseif string.sub(datatype, 1, 5) == "Enum." then
 			local enumName = string.sub(datatype, 6)
-			local enum = D.Enum[enumName]
-			if typeof(value) == "EnumItem" then
+			local enum = enumNamed(enumName)
+			if not enum then
+				return value
+			end
+			value = fromLune(value)
+			if typeofValue(value) == "EnumItem" then
 				if value.EnumType ~= enum then
 					error(`Unable to assign property {key}. Expected Enum.{enumName}, got {tostring(value)}`, 4)
 				end
@@ -558,6 +583,7 @@ function FakeDataModel.new(config: Config)
 		destroyed: boolean,
 		parentLocked: boolean,
 		callbacks: { [string]: any },
+		extra: { [string]: any }, -- class-specific state (e.g. disabled Humanoid states)
 	}
 
 	local stateOf: { [any]: State } = setmetatable({}, { __mode = "k" }) :: any
@@ -576,8 +602,32 @@ function FakeDataModel.new(config: Config)
 		return state
 	end
 
+	-- Read-only properties the engine computes. Like on Roblox, their changed signals don't fire.
+	local DERIVED: { [string]: { [string]: (state: State) -> any } } = {
+		Humanoid = {
+			-- The HumanoidRootPart of the model the humanoid is in.
+			RootPart = function(state: State): any
+				local parent = state.parent
+				if not parent then
+					return nil
+				end
+				for _, child in stateOf[parent].children do
+					local childState = stateOf[child]
+					if childState.name == "HumanoidRootPart" and isA(childState.className, "BasePart") then
+						return child
+					end
+				end
+				return nil
+			end,
+		},
+	}
+
 	-- (true, value) if `key` is a scriptable property of the instance's class.
 	local function readProperty(state: State, key: string): (boolean, any)
+		local derived = DERIVED[state.className]
+		if derived and derived[key] then
+			return true, derived[key](state)
+		end
 		local value = state.properties[key]
 		if value == nil then
 			local info = findProperty(state.className, key)
@@ -637,6 +687,7 @@ function FakeDataModel.new(config: Config)
 			destroyed = false,
 			parentLocked = false,
 			callbacks = {},
+			extra = {},
 		}
 		kinds[proxy] = KIND_INSTANCE
 		return proxy
@@ -910,7 +961,7 @@ function FakeDataModel.new(config: Config)
 			end
 		end)
 		if timeout then
-			taskLib.delay(timeout, function()
+			scheduler:engineDelay(timeout, function()
 				if not done then
 					done = true
 					connection:Disconnect()
@@ -1589,9 +1640,106 @@ function FakeDataModel.new(config: Config)
 			return list
 		end,
 	}
-	ClassMethods.Players = {
-		GetPlayers = function()
+	local function childrenOfClass(parent: any, className: string): { any }
+		local list = {}
+		for _, child in stateOf[parent].children do
+			if isA(stateOf[child].className, className) then
+				table.insert(list, child)
+			end
+		end
+		return list
+	end
+	ClassMethods.Debris = {
+		AddItem = function(_self: any, item: any, lifetime: number?)
+			stateFor(item)
+			scheduler:engineDelay(lifetime or 10, function()
+				Methods.Destroy(item)
+			end)
+		end,
+	}
+	ClassMethods.Teams = {
+		GetTeams = function(self: any): { any }
+			return childrenOfClass(self, "Team")
+		end,
+	}
+	ClassMethods.Team = {
+		GetPlayers = function(self: any): { any }
+			local list = {}
+			for _, player in childrenOfClass(ClassMethods.DataModel.GetService(game, "Players"), "Player") do
+				if select(2, readProperty(stateOf[player], "Team")) == self then
+					table.insert(list, player)
+				end
+			end
+			return list
+		end,
+	}
+	-- Humanoid: the state machine never steps (as in a test place): GetState stays None and
+	-- ChangeState does nothing. State enablement is stored; StateEnabledChanged fires on a change.
+	ClassMethods.Humanoid = {
+		GetState = function(_self: any): any
+			return D.Enum.HumanoidStateType.None
+		end,
+		ChangeState = function(_self: any, _state: any) end,
+		GetStateEnabled = function(self: any, state: any): boolean
+			return stateFor(self).extra["StateDisabled." .. state.Name] == nil
+		end,
+		SetStateEnabled = function(self: any, state: any, enabled: boolean)
+			local instanceState = stateFor(self)
+			local key = "StateDisabled." .. state.Name
+			local wasEnabled = instanceState.extra[key] == nil
+			instanceState.extra[key] = if enabled then nil else true
+			if wasEnabled ~= (enabled == true) then
+				fire(getSignal(instanceState, "StateEnabledChanged"), state, enabled == true)
+			end
+		end,
+	}
+	-- A test place has no input devices: no gamepads, no keys down, no focused text box.
+	ClassMethods.UserInputService = {
+		GetConnectedGamepads = function(): { any }
 			return {}
+		end,
+		GetNavigationGamepads = function(): { any }
+			return {}
+		end,
+		GetGamepadConnected = function(): boolean
+			return false
+		end,
+		GetSupportedGamepadKeyCodes = function(): { any }
+			return {}
+		end,
+		GetKeysPressed = function(): { any }
+			return {}
+		end,
+		GetMouseButtonsPressed = function(): { any }
+			return {}
+		end,
+		IsKeyDown = function(): boolean
+			return false
+		end,
+		IsMouseButtonPressed = function(): boolean
+			return false
+		end,
+		GetLastInputType = function(): any
+			return D.Enum.UserInputType.None
+		end,
+		GetMouseLocation = function(): any
+			return D.Vector2.new(0, 0)
+		end,
+		GetMouseDelta = function(): any
+			return D.Vector2.new(0, 0)
+		end,
+		GetFocusedTextBox = function(): any
+			return nil
+		end,
+	}
+	ClassMethods.GuiService = {
+		IsTenFootInterface = function(): boolean
+			return false
+		end,
+	}
+	ClassMethods.Players = {
+		GetPlayers = function(self: any): { any }
+			return childrenOfClass(self, "Player")
 		end,
 		GetPlayerFromCharacter = function()
 			return nil

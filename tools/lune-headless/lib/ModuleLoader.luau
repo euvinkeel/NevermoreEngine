@@ -15,6 +15,7 @@
 ]]
 
 local luau = require("@lune/luau")
+local task = require("@lune/task")
 
 local FileSnapshot = require("./FileSnapshot")
 local PackageIndex = require("./PackageIndex")
@@ -100,7 +101,10 @@ function ModuleLoader.new(options: Options): Loader
 	end
 
 	local cache: { [string]: { value: any } } = {}
-	local loading: { [string]: boolean } = {}
+	-- path -> the threads in the require chain that is loading it, and threads waiting for it
+	local loading: { [string]: { chain: { [thread]: true }, waiting: { thread } } } = {}
+	-- thread -> the require chain it is part of (for telling recursion from a concurrent require)
+	local chainOf: { [thread]: { [thread]: true } } = setmetatable({}, { __mode = "k" }) :: any
 	local failed: { [string]: boolean } = {}
 	local packageOfDir: { [string]: string } = {}
 	local nodes: { [string]: any } = {}
@@ -289,10 +293,22 @@ function ModuleLoader.new(options: Options): Loader
 		if failed[path] then
 			error("Requested module experienced an error while loading", 3)
 		end
-		if loading[path] then
-			error(`Requested module was required recursively: {relative(path)}`, 3)
+		local current = coroutine.running()
+		local inProgress = loading[path]
+		if inProgress then
+			if inProgress.chain[current] then
+				error(`Requested module was required recursively: {relative(path)}`, 3)
+			end
+			-- Another thread is loading it and yielded: wait for it, as Roblox does.
+			table.insert(inProgress.waiting, current)
+			coroutine.yield()
+			return loadFile(path)
 		end
-		loading[path] = true
+		local chain: { [thread]: true } = chainOf[current] or {}
+		chain[current] = true
+		chainOf[current] = chain
+		local entry = { chain = chain, waiting = {} }
+		loading[path] = entry
 
 		local env = table.clone(options.globals)
 		env.script = nodeFor(path)
@@ -304,6 +320,9 @@ function ModuleLoader.new(options: Options): Loader
 			return table.pack(chunk())
 		end)
 		loading[path] = nil
+		for _, thread in entry.waiting do
+			task.defer(thread)
+		end
 		if not ok then
 			failed[path] = true
 			error(results, 0)

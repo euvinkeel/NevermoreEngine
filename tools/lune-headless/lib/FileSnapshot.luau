@@ -4,9 +4,11 @@
 
 	Lune's fs functions yield, and Luau can't yield inside a metamethod. `script.Parent.Foo` goes
 	through the script node's __index, so every lookup it makes has to be answered from memory.
-	Workspace sources are read eagerly too, so a require that happens inside a metamethod (lazy
-	module tables) doesn't hit the same wall. Paths outside the snapshot fall back to fs, which
-	works everywhere except inside metamethods.
+	Sources are read eagerly too: a require must never yield (Roblox's doesn't, ServiceBag rejects a
+	yielding Init, and a require inside a metamethod can't yield at all). That covers the spec's
+	package closure plus every package its require("Name") literals resolve to. Paths outside the
+	snapshot fall back to fs, which works everywhere except inside metamethods and yielding-checked
+	code.
 ]]
 
 local fs = require("@lune/fs")
@@ -142,10 +144,47 @@ function FileSnapshot.build(index: PackageIndex.Index, specPackageId: string): S
 		self.dirs[srcDir] = srcEntries
 	end
 
-	for _, id in PackageIndex.closure(index, specPackageId) do
+	local walked: { [string]: boolean } = {}
+	local function walkPackage(id: string)
 		local pkg = index.packages[id]
-		if pkg and not SKIP_PACKAGES[pkg.name] then
-			walk(pkg.dir, pkg.isWorkspace)
+		if walked[id] or not pkg or SKIP_PACKAGES[pkg.name] then
+			return
+		end
+		walked[id] = true
+		walk(pkg.dir, true)
+	end
+	for _, id in PackageIndex.closure(index, specPackageId) do
+		walkPackage(id)
+	end
+
+	-- A require can also resolve outside the declared closure (the global fallback). Reading such a
+	-- module later would yield inside `require`, which Roblox never does (and ServiceBag rejects a
+	-- yielding Init). So follow the require("Name") literals in what was read until nothing new
+	-- turns up, and read those packages now too.
+	local scanned: { [string]: boolean } = {}
+	while true do
+		local pending = {}
+		for path in self.sources do
+			if not scanned[path] then
+				table.insert(pending, path)
+			end
+		end
+		if #pending == 0 then
+			break
+		end
+		for _, path in pending do
+			scanned[path] = true
+			local source = self.sources[path]
+			local fromId = PackageIndex.packageOfPath(index, path)
+			if not fromId then
+				continue
+			end
+			for name in string.gmatch(source, 'require%(%s*"([%w_%-%.]+)"%s*%)') do
+				local resolution = PackageIndex.resolve(index, fromId, specPackageId, name)
+				if resolution and not walked[resolution.packageId] then
+					walkPackage(resolution.packageId)
+				end
+			end
 		end
 	end
 

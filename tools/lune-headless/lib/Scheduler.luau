@@ -61,8 +61,12 @@ export type Scheduler = typeof(setmetatable(
 
 local MAX_TIMER_LOOPS = 100000
 
+-- Wall-clock seconds with os.clock()'s resolution: DateTime.now() only has milliseconds, and
+-- Roblox's tick() is much finer (code orders objects by their creation tick()).
+local unixAtStart = DateTimeLib.now().unixTimestampMillis / 1000
+local clockAtStart = os.clock()
 local function realUnixSeconds(): number
-	return DateTimeLib.now().unixTimestampMillis / 1000
+	return unixAtStart + (os.clock() - clockAtStart)
 end
 
 local function traceback(err: any): string
@@ -193,6 +197,16 @@ function Scheduler._cancelFrame(self: Scheduler, thread: any): boolean
 		end
 	end
 	return false
+end
+
+-- A delay that jest fake timers don't touch, for engine-driven timing (Debris, WaitForChild
+-- timeouts): frame-aligned in frame mode, Lune's timer otherwise.
+function Scheduler.engineDelay(self: Scheduler, seconds: number, fn: () -> ())
+	if self.frameWaiters then
+		self:_frameDelay(self.frameWaiters, seconds, fn)
+	else
+		realTask.delay(seconds, self:_guard(fn))
+	end
 end
 
 -- Real waits and delays resume on frames from now on (see resumeFrameWaiters).

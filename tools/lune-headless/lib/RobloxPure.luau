@@ -120,10 +120,6 @@ local function fromMillis(ms: number): any
 	return setmetatable({ UnixTimestampMillis = math.floor(ms) }, DateTimeClass)
 end
 
-function DateTimeClass.ToIsoDate(self: any): string
-	return DateTimeLib.fromUnixTimestamp((rawget(self, "UnixTimestampMillis") :: number) / 1000):toIsoDate()
-end
-
 local function toParts(self: any, universal: boolean): { [string]: number }
 	local dt = DateTimeLib.fromUnixTimestamp((rawget(self, "UnixTimestampMillis") :: number) / 1000)
 	local v = if universal then dt:toUniversalTime() else dt:toLocalTime()
@@ -142,8 +138,224 @@ function DateTimeClass.ToUniversalTime(self: any)
 	return toParts(self, true)
 end
 
+-- Roblox's ISO form: UTC with a Z and no fractional seconds.
+function DateTimeClass.ToIsoDate(self: any): string
+	local t = toParts(self, true)
+	return string.format("%04d-%02d-%02dT%02d:%02d:%02dZ", t.Year, t.Month, t.Day, t.Hour, t.Minute, t.Second)
+end
+
 function DateTimeClass.ToLocalTime(self: any)
 	return toParts(self, false)
+end
+
+-- Formatting: the tokens Roblox documents for DateTime:FormatUniversalTime, English names only.
+
+local MONTH_NAMES = {
+	"January",
+	"February",
+	"March",
+	"April",
+	"May",
+	"June",
+	"July",
+	"August",
+	"September",
+	"October",
+	"November",
+	"December",
+}
+local DAY_NAMES = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" }
+
+-- en-us localized composites.
+local COMPOSITES: { [string]: string } = {
+	LTS = "h:mm:ss A",
+	LT = "h:mm A",
+	LLLL = "dddd, MMMM D, YYYY h:mm A",
+	llll = "ddd, MMM D, YYYY h:mm A",
+	LLL = "MMMM D, YYYY h:mm A",
+	lll = "MMM D, YYYY h:mm A",
+	LL = "MMMM D, YYYY",
+	ll = "MMM D, YYYY",
+	L = "MM/DD/YYYY",
+	l = "M/D/YYYY",
+}
+local COMPOSITE_ORDER = { "LLLL", "llll", "LTS", "LLL", "lll", "LL", "ll", "LT", "L", "l" }
+
+-- Tokens that print names, which only English is emulated for.
+local NAME_TOKENS = { MMMM = true, MMM = true, dddd = true, ddd = true, A = true, a = true }
+
+local TOKEN_ORDER = {
+	"YYYY",
+	"YY",
+	"MMMM",
+	"MMM",
+	"MM",
+	"M",
+	"DDDD",
+	"DDD",
+	"DD",
+	"D",
+	"dddd",
+	"ddd",
+	"d",
+	"HH",
+	"H",
+	"hh",
+	"h",
+	"mm",
+	"m",
+	"ss",
+	"s",
+	"SSS",
+	"SS",
+	"S",
+	"A",
+	"a",
+}
+
+-- Days since 1970-01-01 for a proleptic Gregorian date (Howard Hinnant's days_from_civil).
+local function daysFromCivil(year: number, month: number, day: number): number
+	local y = if month <= 2 then year - 1 else year
+	local era = (if y >= 0 then y else y - 399) // 400
+	local yoe = y - era * 400
+	local mp = (month + 9) % 12
+	local doy = (153 * mp + 2) // 5 + day - 1
+	local doe = yoe * 365 + yoe // 4 - yoe // 100 + doy
+	return era * 146097 + doe - 719468
+end
+
+local function pad(n: number, width: number): string
+	return string.format(`%0{width}d`, n)
+end
+
+local function formatParts(parts: { [string]: number }, format: string, locale: string): string
+	local english = string.lower(string.sub(locale, 1, 2)) == "en"
+	local days = daysFromCivil(parts.Year, parts.Month, parts.Day)
+	local weekDay = (days + 4) % 7 -- 1970-01-01 was a Thursday; Sunday is 0
+	local yearDay = days - daysFromCivil(parts.Year, 1, 1) + 1
+	local hour12 = if parts.Hour % 12 == 0 then 12 else parts.Hour % 12
+
+	local function token(name: string): string
+		if NAME_TOKENS[name] and not english then
+			error(`[lune-headless] DateTime formatting only emulates English names (locale "{locale}")`, 0)
+		end
+		if name == "YYYY" then
+			return pad(parts.Year, 4)
+		elseif name == "YY" then
+			return pad(parts.Year % 100, 2)
+		elseif name == "MMMM" then
+			return MONTH_NAMES[parts.Month]
+		elseif name == "MMM" then
+			return string.sub(MONTH_NAMES[parts.Month], 1, 3)
+		elseif name == "MM" then
+			return pad(parts.Month, 2)
+		elseif name == "M" then
+			return tostring(parts.Month)
+		elseif name == "DDDD" then
+			return pad(yearDay, 3)
+		elseif name == "DDD" then
+			return tostring(yearDay)
+		elseif name == "DD" then
+			return pad(parts.Day, 2)
+		elseif name == "D" then
+			return tostring(parts.Day)
+		elseif name == "dddd" then
+			return DAY_NAMES[weekDay + 1]
+		elseif name == "ddd" then
+			return string.sub(DAY_NAMES[weekDay + 1], 1, 3)
+		elseif name == "d" then
+			return tostring(weekDay)
+		elseif name == "HH" then
+			return pad(parts.Hour, 2)
+		elseif name == "H" then
+			return tostring(parts.Hour)
+		elseif name == "hh" then
+			return pad(hour12, 2)
+		elseif name == "h" then
+			return tostring(hour12)
+		elseif name == "mm" then
+			return pad(parts.Minute, 2)
+		elseif name == "m" then
+			return tostring(parts.Minute)
+		elseif name == "ss" then
+			return pad(parts.Second, 2)
+		elseif name == "s" then
+			return tostring(parts.Second)
+		elseif name == "SSS" then
+			return pad(parts.Millisecond, 3)
+		elseif name == "SS" then
+			return pad(parts.Millisecond // 10, 2)
+		elseif name == "S" then
+			return tostring(parts.Millisecond // 100)
+		elseif name == "A" then
+			return if parts.Hour < 12 then "AM" else "PM"
+		else -- "a"
+			return if parts.Hour < 12 then "am" else "pm"
+		end
+	end
+
+	local out = {}
+	local index = 1
+	while index <= #format do
+		local char = string.sub(format, index, index)
+		if char == "[" then
+			local close = string.find(format, "]", index + 1, true)
+			if close then
+				table.insert(out, string.sub(format, index + 1, close - 1))
+				index = close + 1
+				continue
+			end
+		end
+		local matched = false
+		for _, name in COMPOSITE_ORDER do
+			if string.sub(format, index, index + #name - 1) == name then
+				if not english then
+					error(`[lune-headless] DateTime formatting only emulates English (locale "{locale}")`, 0)
+				end
+				table.insert(out, formatParts(parts, COMPOSITES[name], locale))
+				index += #name
+				matched = true
+				break
+			end
+		end
+		if not matched then
+			for _, name in TOKEN_ORDER do
+				if string.sub(format, index, index + #name - 1) == name then
+					table.insert(out, token(name))
+					index += #name
+					matched = true
+					break
+				end
+			end
+		end
+		if not matched then
+			table.insert(out, char)
+			index += 1
+		end
+	end
+	return table.concat(out)
+end
+
+function DateTimeClass.FormatUniversalTime(self: any, format: string, locale: string): string
+	if type(locale) ~= "string" then
+		error("Argument 2 missing or nil", 2)
+	end
+	return formatParts(toParts(self, true), format, locale)
+end
+
+function DateTimeClass.FormatLocalTime(self: any, format: string, locale: string): string
+	if type(locale) ~= "string" then
+		error("Argument 2 missing or nil", 2)
+	end
+	return formatParts(toParts(self, false), format, locale)
+end
+
+-- "DateTime" for this module's DateTime objects, nil for anything else.
+function RobloxPure.typeName(value: any): string?
+	if type(value) == "table" and getmetatable(value) == DateTimeClass then
+		return "DateTime"
+	end
+	return nil
 end
 
 -- `nowSeconds` lets fake timers drive DateTime.now().
@@ -163,7 +375,26 @@ function RobloxPure.makeDateTime(nowSeconds: () -> number): any
 			return if ok then fromMillis(dt.unixTimestampMillis) else nil
 		end,
 		fromUniversalTime = function(year, month, day, hour, minute, second, millisecond)
-			local dt = DateTimeLib.fromUniversalTime({
+			local y, mo, d = year or 1970, month or 1, day or 1
+			if mo < 1 or mo > 12 or d < 1 or d > 31 then
+				-- Out-of-range calendar fields: let Lune reject them (Roblox's handling is unverified).
+				local dt = DateTimeLib.fromUniversalTime({
+					year = y,
+					month = mo,
+					day = d,
+					hour = 0,
+					minute = 0,
+					second = 0,
+					millisecond = 0,
+				})
+				return fromMillis(dt.unixTimestampMillis)
+			end
+			-- Clock fields roll over (hour 25 is 01:00 the next day), as on Roblox.
+			local seconds = daysFromCivil(y, mo, d) * 86400 + (hour or 0) * 3600 + (minute or 0) * 60 + (second or 0)
+			return fromMillis(seconds * 1000 + (millisecond or 0))
+		end,
+		fromLocalTime = function(year, month, day, hour, minute, second, millisecond)
+			local dt = DateTimeLib.fromLocalTime({
 				year = year or 1970,
 				month = month or 1,
 				day = day or 1,

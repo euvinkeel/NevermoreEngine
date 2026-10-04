@@ -13,6 +13,7 @@ local fs = require("@lune/fs")
 local process = require("@lune/process")
 local serde = require("@lune/serde")
 
+local Expect = require("./lib/Expect")
 local Host = require("./lib/Host")
 local MiniJest = require("./lib/MiniJest")
 local ModuleLoader = require("./lib/ModuleLoader")
@@ -71,6 +72,9 @@ local globals = Host.build({
 		apiPath = root .. "/globalTypes.d.lua",
 	},
 })
+if globals.typeof then
+	Expect.hostTypeof = globals.typeof
+end
 local loader = ModuleLoader.new({
 	index = index,
 	specPath = specPath,
