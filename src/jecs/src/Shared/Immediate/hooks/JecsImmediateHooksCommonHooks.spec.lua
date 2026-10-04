@@ -12,7 +12,9 @@ local ImmediateCoreUtils = require("ImmediateCoreUtils")
 local ImmediateInstall = require("ImmediateInstall")
 local ImmediateScheduler = require("ImmediateScheduler")
 local JecsImmediateHooksCommonHooks = require("JecsImmediateHooksCommonHooks")
+local JecsImmediateHooksCoreHooks = require("JecsImmediateHooksCoreHooks")
 local JecsImmediateHooksInstall = require("JecsImmediateHooksInstall")
+local JecsImmediateHooksRobloxHooks = require("JecsImmediateHooksRobloxHooks")
 local JecsImmediateInstall = require("JecsImmediateInstall")
 local Jest = require("Jest")
 local ServiceBag = require("ServiceBag")
@@ -300,6 +302,49 @@ describe("hooks.gate", function()
 		harness.tick(2)
 
 		expect(results).toEqual({ { true, true }, { false, false } })
+		harness.destroy()
+	end)
+end)
+
+describe("JecsImmediateHooksCommonHooks (facade)", function()
+	it("has every core hook and every Roblox hook, and nothing else", function()
+		local hooks = JecsImmediateHooksCommonHooks({} :: any)
+		local expected = {}
+		for name in JecsImmediateHooksCoreHooks({} :: any) do
+			expected[name] = true
+		end
+		for name in JecsImmediateHooksRobloxHooks({} :: any) do
+			expected[name] = true
+		end
+
+		local actual = {}
+		for name, hook in hooks do
+			expect(type(hook)).toBe("function")
+			actual[name] = true
+		end
+		expect(actual).toEqual(expected)
+	end)
+
+	it("keys a Roblox-pack hook by the game's call site, so nothing wraps it", function()
+		-- State is keyed by the caller's file:line plus the call's order on that line. A wrapper
+		-- would put every call on the wrapper's line, so skipping the first call site would shift
+		-- the second one onto the first one's state.
+		local callFirst = true
+		local first, second = {}, {}
+		local harness = makeHarness(function(hooks)
+			if callFirst then
+				table.insert(first, hooks.guid())
+			end
+			table.insert(second, hooks.guid())
+		end)
+
+		harness.tick()
+		callFirst = false
+		harness.tick()
+
+		expect(type(second[1])).toBe("string")
+		expect(second[1]).never.toBe(first[1])
+		expect(second[2]).toBe(second[1])
 		harness.destroy()
 	end)
 end)
