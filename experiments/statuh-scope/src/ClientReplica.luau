@@ -199,7 +199,33 @@ function ClientReplica.compareWithProjection(self: ClientReplica, expected: { [n
 			return `client is missing net id {netId}`
 		end
 		if not sameValue(have.comps, want.comps) then
-			return `net id {netId} components differ`
+			local function show(value: any): string
+				if value == REDACTED then
+					return "REDACTED"
+				elseif type(value) == "table" then
+					local parts = {}
+					for k, v in value do
+						table.insert(parts, `{k}={show(v)}`)
+					end
+					table.sort(parts)
+					return "{" .. table.concat(parts, ",") .. "}"
+				end
+				return tostring(value)
+			end
+			local keys = {}
+			for key in have.comps do
+				keys[key] = true
+			end
+			for key in want.comps do
+				keys[key] = true
+			end
+			for key in keys do
+				if not sameValue(have.comps[key], want.comps[key]) then
+					return `net id {netId} component {key}: client has {show(have.comps[key])}, expected {show(
+						want.comps[key]
+					)}`
+				end
+			end
 		end
 		local havePairs = {}
 		for key, targets in have.pairs do
@@ -208,7 +234,17 @@ function ClientReplica.compareWithProjection(self: ClientReplica, expected: { [n
 			end
 		end
 		if not sameValue(havePairs, want.pairs) then
-			return `net id {netId} pairs differ`
+			local function show(set: { [number]: { [number]: boolean } }): string
+				local parts = {}
+				for key, targets in set do
+					for target in targets do
+						table.insert(parts, `{key}->{target}`)
+					end
+				end
+				table.sort(parts)
+				return "{" .. table.concat(parts, ",") .. "}"
+			end
+			return `net id {netId} pairs differ: client has {show(havePairs)}, expected {show(want.pairs)}`
 		end
 	end
 	return nil

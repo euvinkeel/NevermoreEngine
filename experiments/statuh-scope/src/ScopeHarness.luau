@@ -276,7 +276,26 @@ function ScopeHarness.step(self: any)
 		end
 		local difference = replica:compareWithProjection(projection)
 		if difference then
-			fail(self, "4 (replica vs projection)", `viewer {index}: {difference}`)
+			local netId = tonumber(string.match(difference, "net id (%d+)"))
+			local entity = if netId then self.entityOfNet[netId] else nil
+			local context = ""
+			if entity then
+				local holders = {}
+				for other in scope.deliveredTo(index) do
+					if scope.netIdOf(other) == netId then
+						table.insert(holders, tostring(other))
+					end
+				end
+				context =
+					` (entity {entity}, alive={world:contains(entity)}, replicated={world:contains(entity) and world:has(
+						entity,
+						Net.Replicated
+					)}, current net id {scope.netIdOf(entity)}, delivered holders of that id: {table.concat(
+						holders,
+						","
+					)})`
+			end
+			fail(self, "4 (replica vs projection)", `viewer {index}: {difference}{context}`)
 		end
 
 		if oracle then

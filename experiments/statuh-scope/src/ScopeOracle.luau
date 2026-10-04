@@ -53,57 +53,36 @@ function ScopeOracle.compute(
 		return world:has(viewerEntity, jecs.pair(Net.Member, room))
 	end
 
-	-- Memoized per (entity, viewer) to keep it simple: returns auth, rel, depth.
-	local memo: { [number]: { [number]: { auth: boolean, rel: boolean, depth: number } } } = {}
-	local visiting: { [number]: boolean } = {}
+	-- final(e, n) = (grants(e) or final(parent, n - 1)) and restrictions(e), following VisibleThrough
+	-- at most `maxInheritDepth` hops from the entity being evaluated. Relevance is
+	-- relevanceRules(e) and relevance(parent, n - 1).
+	local memo: { [string]: { auth: boolean, rel: boolean } } = {}
 
-	local function evaluate(entity: number, index: number): (boolean, boolean, number)
-		local cached = memo[entity] and memo[entity][index]
+	local function evaluate(entity: number, index: number, budget: number): (boolean, boolean)
+		local memoKey = `{entity}:{index}:{budget}`
+		local cached = memo[memoKey]
 		if cached then
-			return cached.auth, cached.rel, cached.depth
+			return cached.auth, cached.rel
 		end
 		local viewerEntity = viewers[index].entity
-		local owners = targets(entity, Net.Owner)
-		local isOwner = table.find(owners, viewerEntity) ~= nil
+		local isOwner = table.find(targets(entity, Net.Owner), viewerEntity) ~= nil
 
-		local auth = false
-		local rel = true
-		local depth = 0
-
+		local inheritedAuth, inheritedRel = false, true
 		local through = world:target(entity, Net.VisibleThrough, 0)
-		if through ~= nil then
+		if through ~= nil and budget > 0 and world:has(through, jecs.Exclusive) then
 			local parent = world:target(entity, through, 0)
-			local ok = false
-			if parent ~= nil and world:has(parent, Net.Replicated) and not visiting[parent] then
-				visiting[entity] = true
-				local parentAuth, parentRel, parentDepth = evaluate(parent, index)
-				visiting[entity] = nil
-				depth = parentDepth + 1
-				if depth <= maxInheritDepth and not (parentDepth > maxInheritDepth) then
-					auth = parentAuth
-					rel = parentRel
-					ok = true
-				end
-			end
-			if not ok then
-				depth = maxInheritDepth + 1
+			if parent ~= nil and world:has(parent, Net.Replicated) then
+				inheritedAuth, inheritedRel = evaluate(parent, index, budget - 1)
 			end
 		end
 
-		if world:has(entity, Net.Public) then
-			auth = true
-		else
-			for _, room in targets(entity, Net.Audience) do
-				if isMember(viewerEntity, room) then
-					auth = true
-				end
-			end
-			if isOwner then
-				auth = true
+		local granted = inheritedAuth or isOwner or world:has(entity, Net.Public)
+		for _, room in targets(entity, Net.Audience) do
+			if isMember(viewerEntity, room) then
+				granted = true
 			end
 		end
 
-		-- Restrictions apply after every grant (including grant rules below).
 		local restricted = true
 		if world:has(entity, Net.VisibleTo) then
 			local value = world:get(entity, Net.VisibleTo)
@@ -116,6 +95,7 @@ function ScopeOracle.compute(
 			end
 		end
 
+		local rel = inheritedRel
 		for _, rule in rules do
 			if world:has(entity, rule.appliesTo) then
 				local key = rule.key(entity)
@@ -125,21 +105,20 @@ function ScopeOracle.compute(
 				elseif rule.mode == "restrict" then
 					restricted = restricted and passes
 				else
-					auth = auth or passes
+					granted = granted or passes
 				end
 			end
 		end
-		auth = auth and restricted
 
-		memo[entity] = memo[entity] or {}
-		memo[entity][index] = { auth = auth, rel = rel, depth = depth }
-		return auth, rel, depth
+		local auth = granted and restricted
+		memo[memoKey] = { auth = auth, rel = rel }
+		return auth, rel
 	end
 
 	for entity in world:query(Net.Replicated) do
 		local owners = targets(entity, Net.Owner)
 		for index, viewer in viewers do
-			local auth, rel = evaluate(entity, index)
+			local auth, rel = evaluate(entity, index, maxInheritDepth)
 			if auth then
 				result[index].auth[entity] = true
 			end
@@ -154,13 +133,14 @@ function ScopeOracle.compute(
 	return result
 end
 
--- True when every (entity, viewer) visible in `after` was visible in `before`.
+-- True when every (entity, viewer) authorized in `after` was authorized in `before`. Relevance is
+-- interest management, not a security boundary, so it isn't part of this check.
 function ScopeOracle.isSubset(after: { [number]: ViewerScope }, before: { [number]: ViewerScope }): (boolean, string?)
 	for index, scope in after do
 		local was = before[index]
 		for entity in scope.auth do
-			if scope.rel[entity] and not (was and was.auth[entity] and was.rel[entity]) then
-				return false, `entity {entity} became visible to viewer {index}`
+			if not (was and was.auth[entity]) then
+				return false, `entity {entity} became authorized for viewer {index}`
 			end
 		end
 	end
