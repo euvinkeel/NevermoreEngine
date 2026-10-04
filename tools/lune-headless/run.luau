@@ -7,7 +7,7 @@
 	Which specs run (default: every spec in the immediateutils closure):
 		--all                     every spec under src/
 		--package=<a,b>           packages by directory or npm name (e.g. maid,@quenty/rx)
-		<paths>                   spec files or package directories
+		<paths>                   spec files, package directories, or other directories of specs
 
 	Options:
 		--level=basic             host level: none | basic | roblox (see lib/Host.luau)
@@ -140,10 +140,32 @@ elseif options.package or #positional > 0 then
 			addSpec(path)
 		else
 			local id = PackageIndex.packageOfPath(index, path .. "/") or packageIdFor(arg)
-			if not id then
-				error(`"{arg}" is neither a spec file nor a package`)
+			if id then
+				addPackage(id)
+			elseif fs.isDir(path) then
+				-- A plain directory outside src/ (e.g. experiments/): every spec file under it.
+				local found = {}
+				local function walk(dir: string)
+					local entries = fs.readDir(dir)
+					table.sort(entries)
+					for _, entry in entries do
+						local child = dir .. "/" .. entry
+						if entry ~= "node_modules" and string.sub(entry, 1, 1) ~= "." then
+							if fs.isDir(child) then
+								walk(child)
+							elseif string.match(entry, "%.spec%.luau?$") then
+								table.insert(found, child)
+							end
+						end
+					end
+				end
+				walk(path)
+				for _, spec in found do
+					addSpec(spec)
+				end
+			else
+				error(`"{arg}" is neither a spec file, a package nor a directory`)
 			end
-			addPackage(id)
 		end
 	end
 else
