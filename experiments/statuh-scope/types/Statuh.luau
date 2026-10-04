@@ -94,8 +94,14 @@ export type NetVocabulary = {
 	makePublic: (world: World, entity: Entity<any>) -> (),
 	setOwner: (world: World, entity: Entity<any>, owner: PlayerEntity) -> (),
 	-- Visible to whoever sees `target`, an entity or a player (not a room). nil removes the link.
+	-- It removes the old pair before adding the new one, because jecs 0.11.0-quenty.3 can lose an
+	-- entity from every query when an exclusive relation is retargeted in place.
 	visibleThrough: (world: World, entity: Entity<any>, target: (Entity<nil> | PlayerEntity)?) -> (),
 	override: (world: World, entity: Entity<any>, value: Override?) -> (),
+	-- Deletes the entity and its ChildOf descendants. Use it instead of world:delete: it removes
+	-- the pairs pointing into what it deletes first, which jecs 0.11.0-quenty.3 needs to delete
+	-- without corrupting other entities (experiments/jecs-findings).
+	destroy: (world: World, entity: Entity<any>) -> (),
 }
 
 export type Net = {

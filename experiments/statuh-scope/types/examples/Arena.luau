@@ -104,6 +104,12 @@ local function drop(rt: Runtime, item: Statuh.Entity<nil>, holder: PlayerEntity)
 	Net.visibleThrough(rt.world, item, nil)
 end
 
+-- The player left: their entity goes, and the pairs pointing at it (OwnedBy on swords they
+-- owned, VisibleThrough on items they held) go with it.
+local function onLeave(rt: Runtime, me: PlayerEntity)
+	Net.destroy(rt.world, me)
+end
+
 -- Client side: a hidden Position means the player went out of range, not that it was removed.
 local function onClientTick(rt: Runtime, player: Statuh.Entity<nil>, markers: { [any]: boolean })
 	if rt.net.componentRemovalKind(player, C.Position) == "HIDE" then
@@ -118,5 +124,6 @@ return {
 	dropSword = dropSword,
 	pickUp = pickUp,
 	drop = drop,
+	onLeave = onLeave,
 	onClientTick = onClientTick,
 }

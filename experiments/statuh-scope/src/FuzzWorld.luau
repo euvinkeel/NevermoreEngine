@@ -9,6 +9,7 @@
 
 	Every failure message starts with the seed and frame, so `runSeed(seed, frames)` replays it.
 ]]
+local JecsWorkarounds = require("../../jecs-findings/JecsWorkarounds")
 local Rng = require("./Rng")
 local ScopeHarness = require("./ScopeHarness")
 local ScopeOracle = require("./ScopeOracle")
@@ -24,6 +25,9 @@ function FuzzWorld.runSeed(
 		enterBudget: number?,
 		onFrame: ((any, number) -> ())?,
 		beforeStep: ((any, number) -> ())?,
+		-- false: plain jecs calls instead of JecsWorkarounds. ScopeHarness's jecs integrity check
+		-- then shows which jecs bugs the fuzz runs into.
+		jecsWorkarounds: boolean?,
 	}?
 )
 	local rng = Rng.new(seed)
@@ -31,6 +35,7 @@ function FuzzWorld.runSeed(
 		enterBudget = options and options.enterBudget,
 	})
 	local world, Net, jecs, scope = h.world, h.Net, h.jecs, h.scope
+	local useWorkarounds = not (options and options.jecsWorkarounds == false)
 
 	local C = {
 		Name = world:component(),
@@ -222,34 +227,31 @@ function FuzzWorld.runSeed(
 		table.insert(things, e)
 	end
 
-	-- jecs 0.11.0-quenty.3 bugs (see experiments/jecs-findings): deleting an entity can corrupt a
-	-- survivor that holds a relation pair to it, once anything has held a ChildOf pair and another
-	-- pair to that entity at the same time (as a weapon that's ChildOf and VisibleThrough its unit
-	-- does), and a cascading delete can skip or crash on children that hold pairs to each other. So
-	-- before every delete, detach every pair pointing into the deleted set (jecs would remove them
-	-- anyway), and the fuzz tests the scope core, not those bugs. The scenarios cover a
-	-- VisibleThrough target deleted with its pairs left for jecs to remove.
-	local function safeDelete(e: number)
-		local doomed = { e }
-		local i = 1
-		while i <= #doomed do
-			for child in world:query(jecs.pair(jecs.ChildOf, doomed[i])) do
-				table.insert(doomed, child)
-			end
-			i += 1
+	-- jecs 0.11.0-quenty.3 has bugs in deletes and in retargeting exclusive relations (see
+	-- experiments/jecs-findings), so deletes and retargets go through JecsWorkarounds, as a game
+	-- on that version would, and the fuzz tests the scope core rather than those bugs. ScopeHarness
+	-- checks jecs's own bookkeeping every frame. The arena scenario covers a VisibleThrough target
+	-- deleted with plain world:delete, its pairs left for jecs to remove.
+	local function delete(e: number)
+		if useWorkarounds then
+			JecsWorkarounds.delete(world, e)
+		else
+			world:delete(e)
 		end
-		for _, target in doomed do
-			for _, relation in { Follows, Net.VisibleThrough } do
-				local followers = {}
-				for follower in world:query(jecs.pair(relation, target)) do
-					table.insert(followers, follower)
-				end
-				for _, follower in followers do
-					world:remove(follower, jecs.pair(relation, target))
-				end
+	end
+
+	-- Points an exclusive relation at `target`, or removes it when `target` is nil.
+	local function setTarget(e: number, relation: number, target: number?)
+		if useWorkarounds then
+			JecsWorkarounds.setTarget(world, e, relation, target)
+		elseif target ~= nil then
+			world:add(e, jecs.pair(relation, target))
+		else
+			local current = world:target(e, relation, 0)
+			if current then
+				world:remove(e, jecs.pair(relation, current))
 			end
 		end
-		world:delete(e)
 	end
 
 	local function togglePair(e: number, relation: number, target: number)
@@ -266,7 +268,7 @@ function FuzzWorld.runSeed(
 		function()
 			local e = rng:pick(alive())
 			if e then
-				safeDelete(e)
+				delete(e)
 			end
 		end,
 		function()
@@ -397,13 +399,9 @@ function FuzzWorld.runSeed(
 			if e then
 				local index = table.find(list, e) :: number
 				if index > 1 and rng:chance(0.7) then
-					world:add(e, jecs.pair(jecs.ChildOf, list[rng:int(1, index - 1)]))
+					setTarget(e, jecs.ChildOf, list[rng:int(1, index - 1)])
 				else
-					-- Explicit target: removing pair(R, Wildcard) fires OnRemove but keeps the pair.
-					local parent = world:target(e, jecs.ChildOf, 0)
-					if parent then
-						world:remove(e, jecs.pair(jecs.ChildOf, parent))
-					end
+					setTarget(e, jecs.ChildOf, nil)
 				end
 			end
 		end,
@@ -411,13 +409,12 @@ function FuzzWorld.runSeed(
 			-- Point VisibleThrough somewhere else (cycles allowed), or drop it.
 			local e = rng:pick(alive())
 			if e then
-				local current = world:target(e, Net.VisibleThrough, 0)
-				if current and rng:chance(0.3) then
-					world:remove(e, jecs.pair(Net.VisibleThrough, current))
+				if world:target(e, Net.VisibleThrough, 0) and rng:chance(0.3) then
+					setTarget(e, Net.VisibleThrough, nil)
 				else
 					local target = anyEntity()
 					if target then
-						world:add(e, jecs.pair(Net.VisibleThrough, target))
+						setTarget(e, Net.VisibleThrough, target)
 					end
 				end
 			end
@@ -426,13 +423,7 @@ function FuzzWorld.runSeed(
 			local e = rng:pick(alive())
 			local target = rng:pick(alive())
 			if e and target then
-				local followed = world:target(e, Follows, 0)
-				if followed then
-					world:remove(e, jecs.pair(Follows, followed))
-				end
-				if rng:chance(0.8) then
-					world:add(e, jecs.pair(Follows, target))
-				end
+				setTarget(e, Follows, if rng:chance(0.8) then target else nil)
 			end
 		end,
 		function()

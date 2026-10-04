@@ -18,7 +18,7 @@ The owner's decisions on the first version (`agent-handoff/QUESTIONS.md`, "Owner
 | `test/*.spec.luau` | Scenario specs (the four games) and the randomized invariant specs. |
 | `types/` | Typed stubs of the chosen API, example games that must type-check, misuse that must not. |
 | `bench/bench.luau` | Per-frame cost at 50 players x 2,000 entities. |
-| `tools/` | `replay`, `trace` and `soak` for fuzz seeds, and a jecs-only delete search. |
+| `tools/` | `replay`, `trace` and `soak` for fuzz seeds. |
 
 ```bash
 lune run tools/lune-headless/run.luau experiments/statuh-scope          # specs (20 tests, ~10 s)
@@ -266,6 +266,17 @@ A component is never sent to a client that doesn't have its entity, so its visib
 - `bindMinted(entity, player, netId)` gives the server-made entity the client's id, and pins the client into its scope until `acknowledge`.
 - If the action is acknowledged without the spawn, the client gets ROLLBACK.
 
+### Living with jecs 0.11.0-quenty.3
+
+Statuh is built on the vendored jecs, which has six bugs (`experiments/jecs-findings/`). By the owner's rule they stay here: nobody contacts the jecs project about them. Statuh works around them instead:
+
+- **Destroying an entity goes through a safe delete:** `Net.destroy` in the typed API, `JecsWorkarounds.delete` underneath. It removes the ordinary pairs pointing into what it deletes before deleting. A plain `world:delete` can corrupt entities that survive it, leave a `ChildOf` child alive, or crash.
+- **`Net.visibleThrough` removes the old pair before adding the new one.** Retargeting an exclusive relation in place, which a second `world:add(e, pair(Net.VisibleThrough, other))` does, can later drop the entity from every query. Reparenting with `ChildOf` has the same problem.
+- **Nothing removes `pair(R, jecs.Wildcard)`.**
+- **Tests check jecs's own bookkeeping every frame** (invariant 0 below). Comparing the engine with the oracle can't see damage to the world, because both read it.
+
+In the fuzz, plain jecs calls hit a jecs bug in 87 of 1,000 seeds within 60 frames, every one caught by invariant 0. With the workarounds, none of 6,000 seeds do.
+
 ### Where this departs from the reference notes, and why
 
 | Reference v2 says | Prototype does | Why |
@@ -352,6 +363,7 @@ Limits of the old solver, found while doing this:
 
 **Invariants**, checked by `ScopeHarness` after every frame of every scenario and fuzz run:
 
+0. **jecs integrity.** jecs's bookkeeping is consistent (`JecsWorkarounds.checkIntegrity`), checked before anything reads the world.
 1. **Protocol.** The phase order holds, and no message mentions an id the client doesn't have, except the subject of ENTER and ROLLBACK.
 2. **Oracle agreement.** Engine scope equals the oracle's from-scratch answer for every entity and client.
 3. **No out-of-scope net id** in any message, references included.
@@ -370,12 +382,12 @@ Plus, at random points, a narrowing edit is applied and the oracle checks that a
 - references, owner-only data, unreplicate/re-replicate, deletes with cascades;
 - 0–6 random edits per frame.
 
-Before every delete, the fuzz detaches the pairs that point into the deleted set, to avoid the jecs bugs below. The arena scenario covers a `VisibleThrough` target deleted with its pairs left for jecs to remove.
+Deletes and retargets go through `JecsWorkarounds`, as game code on this jecs must; `JECS_WORKAROUNDS=0` runs plain jecs calls instead. The arena scenario covers a `VisibleThrough` target deleted with plain `world:delete`, its pairs left for jecs to remove.
 
 Every failure prints its seed and frame, and `tools/replay.luau` and `tools/trace.luau` replay it.
 
 - **In the spec suite:** 150 seeds × 40 frames unbudgeted plus 100 × 40 with an ENTER budget of 2.
-- **Soak:** 3,000 seeds × 60 frames unbudgeted plus 3,000 × 60 with budget 3, i.e. 360,000 checked frames, **0 failures** (about 90 s each).
+- **Soak:** 3,000 seeds × 60 frames unbudgeted plus 3,000 × 60 with budget 3, i.e. 360,000 checked frames, **0 failures** (about 100 s each).
 
 The tests catch a broken core. Making it send REM instead of HIDE, or not re-key entities when a viewer's keys grow, fails both the scenarios and the fuzz.
 
@@ -388,11 +400,13 @@ The fuzz found these in the prototype, all fixed:
 5. Owner-only data leaking when ownership and the value changed in the same frame.
 6. A stale parent after a reparent, during the optimization work.
 
-It also found bugs in the vendored jecs. `experiments/jecs-findings/` has a minimal repro for each, and the cause of the first:
+It, and the random search in `experiments/jecs-findings/`, also found six bugs in the vendored jecs. That folder has a minimal repro for each, the cause of five, and the workarounds above:
 
-- **A delete can corrupt an entity that survives it,** when that entity holds a relation pair to the deleted one and anything once held both a `ChildOf` pair and another pair to it. The survivor's data reads nil and it keeps a dangling pair. The cause is in `world_delete`, and a one-line fix was tested on a scratch copy.
-- **A cascade delete can skip a child** that a sibling's deletion moved mid-cascade, leaving a dangling `ChildOf` that later resolves to a recycled id.
+- **A delete can corrupt an entity that survives it,** when that entity holds a relation pair to the deleted one and anything once held both a `ChildOf` pair and another pair to it.
+- **A cascade delete can skip a child** that a sibling's deletion moved mid-cascade, leaving a dangling `ChildOf`.
 - **A cascade delete can crash** when two children hold pairs to a grandchild.
+- **Deleting an entity with no components can corrupt another entity.**
+- **Retargeting an exclusive relation can drop an entity from every query,** once the new target is deleted and its id reused.
 - **`world:remove(e, pair(R, jecs.Wildcard))`** leaves the pair, fires OnRemove, and corrupts the entity's other data.
 
 ### Cost
@@ -441,6 +455,6 @@ Optimizations not done yet:
 3. **Overrides that widen.** `VisibleTo` only narrows. Is there a case for an override that grants (show this one entity to spectators)? Today that's just an Audience grant.
 4. **Key agreement under the old solver** is only enforced for unannotated rules. Worth revisiting on the new solver.
 5. **Rule latching** means adding `appliesTo` after spawn doesn't subject an entity to a rule. Should that be an error in debug builds?
-6. **The jecs bugs:** report upstream, or patch the vendored fork? One of them has a tested one-line fix.
-7. **Per-client cost at the join frame** (~100–500 ms here) says joins must be budgeted. What budget, and should globals go first (the notes' `rt.net.ready()`)?
-8. **Game guardrail 5** ("never delete a VisibleThrough target without a cascade") no longer protects anything: deleting the target fails closed. Drop it from the notes?
+6. **Per-client cost at the join frame** (~100–500 ms here) says joins must be budgeted. What budget, and should globals go first (the notes' `rt.net.ready()`)?
+7. **Game guardrail 5** ("never delete a VisibleThrough target without a cascade") no longer protects anything: deleting the target fails closed. Drop it from the notes?
+8. **A direct `world:delete` or retarget in game code** takes jecs's broken path, and Statuh can't stop it. Should debug builds check jecs's integrity every frame, as the tests do, to catch it?

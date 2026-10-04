@@ -4,6 +4,8 @@
 	every frame. Tests build a world through it, edit the world, then call `step()`.
 
 	Invariants checked every step (each failure says which one):
+	0. jecs's own bookkeeping is consistent (JecsWorkarounds.checkIntegrity). The engine and the
+	   oracle both read the world, so damage to it would get past every other check.
 	1. The protocol: replicas apply every frame without error (see ClientReplica).
 	2. Engine scope equals ScopeOracle's from-scratch answer, for every entity and viewer.
 	3. No message mentions a net id the receiver isn't authorized for (except LEAVE/DEL/ROLLBACK).
@@ -18,6 +20,7 @@
 
 local ClientReplica = require("./ClientReplica")
 local Jecs = require("./Jecs")
+local JecsWorkarounds = require("../../jecs-findings/JecsWorkarounds")
 local ScopeOracle = require("./ScopeOracle")
 local StatuhScope = require("./StatuhScope")
 
@@ -100,6 +103,12 @@ function ScopeHarness.step(self: any)
 	local world = self.world
 	local scope = self.scope
 	local Net = self.Net
+
+	-- 0: jecs's own bookkeeping, before anything reads the world.
+	local damage = JecsWorkarounds.checkIntegrity(world)
+	if damage then
+		fail(self, "0 (jecs integrity)", damage)
+	end
 
 	-- Record net ids before the frame, so DELs of entities removed since can be looked up.
 	for entity in world:query(Net.Replicated) do
