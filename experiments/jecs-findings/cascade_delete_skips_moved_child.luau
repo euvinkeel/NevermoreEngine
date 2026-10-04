@@ -28,4 +28,9 @@ world:delete(parent)
 print("a (child) alive:", world:contains(a))
 print("b (child) alive:", world:contains(b), "<- expected false")
 local recycled = world:entity()
-print("after recycling the parent's id, b's ChildOf target:", world:contains(b) and world:target(b, jecs.ChildOf, 0), "new entity:", recycled)
+print(
+	"after recycling the parent's id, b's ChildOf target:",
+	world:contains(b) and world:target(b, jecs.ChildOf, 0),
+	"new entity:",
+	recycled
+)
