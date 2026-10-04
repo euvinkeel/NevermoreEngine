@@ -1,6 +1,7 @@
 --[[
 	jecs 0.11.0-quenty.3: world:remove(e, pair(R, jecs.Wildcard)) doesn't remove the pair, still fires
 	OnRemove hooks for it, and corrupts the entity's other data (has() says true, get() returns nil).
+	JecsWorkarounds.removeAll removes the targets one at a time instead.
 
 	lune run experiments/jecs-findings/wildcard_remove_corrupts_entity.luau
 ]]

@@ -16,6 +16,7 @@
 	same thing wildcard_remove_corrupts_entity.luau shows). Clearing `to_remove` before that
 	`continue` fixes this script and the Statuh fuzz seed that found it. Which pair `next` picks
 	depends on hashing, so the script declares the relations in the order that shows it.
+	JecsWorkarounds.delete avoids it.
 
 	lune run experiments/jecs-findings/delete_corrupts_survivor.luau
 ]]

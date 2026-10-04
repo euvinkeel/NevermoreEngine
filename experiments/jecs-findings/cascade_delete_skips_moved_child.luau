@@ -5,6 +5,8 @@
 	(here: it held an ordinary relation pair to that sibling, which jecs removes), and its old
 	archetype is older than the sibling's. The survivor keeps a dangling (ChildOf, parent) pair, and
 	once jecs recycles the parent's id, world:target(child, ChildOf) returns the new, unrelated entity.
+	The delete's walk over archetypes fixes its range when it starts, and the child's new archetype
+	is created during the walk, past that range. JecsWorkarounds.delete avoids it.
 
 	lune run experiments/jecs-findings/cascade_delete_skips_moved_child.luau
 ]]

@@ -6,8 +6,8 @@
 	cascades through the children, removes the pairs to the grandchild while the cascade is
 	moving entities between archetypes, and errors inside jecs ("attempt to perform arithmetic
 	(mod) on nil and number"). Same family as cascade_delete_skips_moved_child.luau: an entity
-	is moved mid-cascade. Found by a jecs-only random search
-	(experiments/statuh-scope/tools/jecs_delete_search.luau) and shrunk to these five operations.
+	is moved mid-cascade. Found by an earlier, delete-only version of search.luau and shrunk to
+	these five operations. JecsWorkarounds.delete avoids it.
 
 	lune run experiments/jecs-findings/cascade_delete_crashes.luau
 ]]
