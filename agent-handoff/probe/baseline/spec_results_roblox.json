@@ -1,0 +1,529 @@
+[
+ {
+  "pkg": "immediateutils",
+  "spec": "ImmediateHotReloadInstall.spec.lua",
+  "file": "<repo>/src/immediateutils/src/Shared/hotreload/ImmediateHotReloadInstall.spec.lua",
+  "ms": 779,
+  "failed": 15,
+  "failures": [
+   "ImmediateHotReloadInstall outside Studio play > delegates to RegisterDescendantModuleScripts :: runtime error: [string \"spec\"]:39: attempt to index nil with 'FindFirstChild'\nstack traceback:\n\t[string \"spec\"]:39: in function 'cloneFixture'\n\t[string \"spec\"]:48: in function 'addLoader'\n\t[string \"spec\"]:89: in function <[string \"spec\"]:87>",
+   "ImmediateHotReloadInstall live loading > registers via an execution clone on first load :: runtime error: GenerateGUID is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:72: in function 'uniqueRootName'\n\t[string \"spec\"]:77: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:110: in function <[string \"spec\"]:",
+   "ImmediateHotReloadInstall live loading > replaces the same scheduler name and Destroy()s the previous system once :: runtime error: GenerateGUID is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:72: in function 'uniqueRootName'\n\t[string \"spec\"]:77: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:135: in function <[string \"spec\"]:",
+   "ImmediateHotReloadInstall live loading > normalizes explicit names and retires the previous name on change :: runtime error: GenerateGUID is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:72: in function 'uniqueRootName'\n\t[string \"spec\"]:77: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:155: in function <[string \"spec\"]:",
+   "ImmediateHotReloadInstall live loading > rejects a duplicate scheduler name and keeps the first registration :: runtime error: GenerateGUID is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:72: in function 'uniqueRootName'\n\t[string \"spec\"]:77: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:179: in function <[string \"spec\"]:",
+   "ImmediateHotReloadInstall live loading > keeps the previous version when a candidate fails, then recovers :: runtime error: GenerateGUID is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:72: in function 'uniqueRootName'\n\t[string \"spec\"]:77: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:197: in function <[string \"spec\"]:",
+   "ImmediateHotReloadInstall live loading > unregisters when the canonical module is removed :: runtime error: GenerateGUID is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:72: in function 'uniqueRootName'\n\t[string \"spec\"]:77: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:226: in function <[string \"spec\"]:",
+   "ImmediateHotReloadInstall live loading > ignores a stale yielding require after a newer revision :: runtime error: GenerateGUID is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:72: in function 'uniqueRootName'\n\t[string \"spec\"]:77: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:243: in function <[string \"spec\"]:",
+   "ImmediateHotReloadInstall live loading > does not treat HotReloaded canonicals as ineligible :: runtime error: GenerateGUID is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:72: in function 'uniqueRootName'\n\t[string \"spec\"]:77: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:265: in function <[string \"spec\"]:",
+   "ImmediateHotReloadInstall live loading > does not register execution-clone instances as canonical systems :: runtime error: GenerateGUID is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:72: in function 'uniqueRootName'\n\t[string \"spec\"]:77: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:278: in function <[string \"spec\"]:",
+   "ImmediateHotReloadInstall shadow publication > discovers a late shadow tree and replaces live canonicals :: runtime error: GenerateGUID is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:72: in function 'uniqueRootName'\n\t[string \"spec\"]:77: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:297: in function <[string \"spec\"]:",
+   "ImmediateHotReloadInstall shadow publication > rebinds when the shadow folder is replaced :: runtime error: GenerateGUID is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:72: in function 'uniqueRootName'\n\t[string \"spec\"]:77: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:327: in function <[string \"spec\"]:",
+   "ImmediateHotReloadInstall shadow publication > mirrorShadow is a no-op when the live folder is not under ReplicatedStorage :: runtime error: [string \"spec\"]:39: attempt to index nil with 'FindFirstChild'\nstack traceback:\n\t[string \"spec\"]:39: in function 'cloneFixture'\n\t[string \"spec\"]:48: in function 'addLoader'\n\t[string \"spec\"]:366: in function <[string \"spec\"]:364>",
+   "ImmediateHotReloadInstall cleanup > runtime-first cleanup unregisters systems :: runtime error: GenerateGUID is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:72: in function 'uniqueRootName'\n\t[string \"spec\"]:77: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:374: in function <[string \"spec\"]:",
+   "ImmediateHotReloadInstall cleanup > scheduler-first cleanup does not error :: runtime error: GenerateGUID is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:72: in function 'uniqueRootName'\n\t[string \"spec\"]:77: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:385: in function <[string \"spec\"]:"
+  ],
+  "passed": 0
+ },
+ {
+  "pkg": "immediateutils",
+  "spec": "ImmediateScheduler.spec.lua",
+  "file": "<repo>/src/immediateutils/src/Shared/scheduler/ImmediateScheduler.spec.lua",
+  "ms": 791,
+  "failed": 0,
+  "failures": {},
+  "passed": 3
+ },
+ {
+  "pkg": "maid",
+  "spec": "MaidTaskUtils.spec.lua",
+  "file": "<repo>/src/maid/src/Shared/MaidTaskUtils.spec.lua",
+  "ms": 812,
+  "failed": 0,
+  "failures": {},
+  "passed": 5
+ },
+ {
+  "pkg": "nevermore-test-runner",
+  "spec": "NevermoreTestResults.spec.lua",
+  "file": "<repo>/src/nevermore-test-runner/src/Server/NevermoreTestResults.spec.lua",
+  "ms": 780,
+  "failed": 0,
+  "failures": {},
+  "passed": 14
+ },
+ {
+  "pkg": "brio",
+  "spec": "BrioUtils.spec.lua",
+  "file": "<repo>/src/brio/src/Shared/BrioUtils.spec.lua",
+  "ms": 794,
+  "failed": 3,
+  "failures": [
+   "BrioUtils.flatten({}) [describe body] [string \"Signal\"]:81: attempt to call a nil value",
+   "BrioUtils.flatten with out a brio in it [describe body] [string \"Signal\"]:81: attempt to call a nil value",
+   "BrioUtils.flatten a dead brio in it > should return a brio that > is a brio :: runtime error: [string \"spec\"]:71: attempt to index function with 'any'\nstack traceback:\n\t[string \"spec\"]:71: in function <[string \"spec\"]:70>"
+  ],
+  "passed": 1
+ },
+ {
+  "pkg": "brio",
+  "spec": "RxBrioUtils.spec.lua",
+  "file": "<repo>/src/brio/src/Shared/RxBrioUtils.spec.lua",
+  "ms": 771,
+  "failed": 8,
+  "failures": [
+   "RxBrioUtils.combineLatest({}) > should execute immediately :: runtime error: [string \"Signal\"]:81: attempt to call a nil value\nstack traceback:\n\t[string \"Signal\"]:81: in function 'new'\n\t[string \"Signal\"]:192: in function 'Connect'\n\t[string \"BrioUtils\"]:133: in function 'first'\n\t[string \"BrioUtils\"]:102: in function 'flatten'\n\t[string \"Rx\"]:913: in function <[s",
+   "RxBrioUtils.combineLatest({ value = Observable(Brio(5)) }) > should execute immediately :: runtime error: [string \"Signal\"]:81: attempt to call a nil value\nstack traceback:\n\t[string \"Signal\"]:81: in function 'new'\n\t[string \"Signal\"]:192: in function 'Connect'\n\t[string \"BrioUtils\"]:127: in function 'first'\n\t[string \"BrioUtils\"]:102: in function 'flatten'\n\t[string \"Rx\"]:913: in function <[s",
+   "RxBrioUtils.flatCombineLatest [describe body] [string \"Signal\"]:81: attempt to call a nil value",
+   "RxBrioUtils.switchToBrio > should clone an input brio instead of forwarding it directly :: runtime error: [string \"Signal\"]:81: attempt to call a nil value\nstack traceback:\n\t[string \"Signal\"]:81: in function 'new'\n\t[string \"Signal\"]:192: in function 'Connect'\n\t[string \"BrioUtils\"]:33: in function 'clone'\n\t[string \"RxBrioUtils\"]:790: in function <[string \"RxBrioUtils\"]:780>\n\t[string \"Subsc",
+   "RxBrioUtils.switchToBrio > should kill clone when the source brio dies :: runtime error: [string \"Signal\"]:81: attempt to call a nil value\nstack traceback:\n\t[string \"Signal\"]:81: in function 'new'\n\t[string \"Signal\"]:192: in function 'Connect'\n\t[string \"BrioUtils\"]:33: in function 'clone'\n\t[string \"RxBrioUtils\"]:790: in function <[string \"RxBrioUtils\"]:780>\n\t[string \"Subsc",
+   "RxBrioUtils.switchToBrio > should apply predicate to unwrapped brio values :: runtime error: [string \"Signal\"]:81: attempt to call a nil value\nstack traceback:\n\t[string \"Signal\"]:81: in function 'new'\n\t[string \"Signal\"]:192: in function 'Connect'\n\t[string \"BrioUtils\"]:33: in function 'clone'\n\t[string \"RxBrioUtils\"]:790: in function <[string \"RxBrioUtils\"]:780>\n\t[string \"Subsc",
+   "RxBrioUtils.switchToBrio > should handle interleaved brio and plain value emissions :: runtime error: [string \"Signal\"]:81: attempt to call a nil value\nstack traceback:\n\t[string \"Signal\"]:81: in function 'new'\n\t[string \"Signal\"]:192: in function 'Connect'\n\t[string \"BrioUtils\"]:33: in function 'clone'\n\t[string \"RxBrioUtils\"]:790: in function <[string \"RxBrioUtils\"]:780>\n\t[string \"Subsc",
+   "RxBrioUtils.switchToBrio > should handle source brio dying while subscribed then new emission :: runtime error: [string \"Signal\"]:81: attempt to call a nil value\nstack traceback:\n\t[string \"Signal\"]:81: in function 'new'\n\t[string \"Signal\"]:192: in function 'Connect'\n\t[string \"BrioUtils\"]:33: in function 'clone'\n\t[string \"RxBrioUtils\"]:790: in function <[string \"RxBrioUtils\"]:780>\n\t[string \"Subsc"
+  ],
+  "passed": 13
+ },
+ {
+  "pkg": "rx",
+  "spec": "Rx.spec.lua",
+  "file": "<repo>/src/rx/src/Shared/Rx.spec.lua",
+  "ms": 749,
+  "failed": 3,
+  "failures": [
+   "Rx.combineLatest({}) > should execute immediately :: runtime error: [string \"spec\"]:24: attempt to index function with 'any'\nstack traceback:\n\t[string \"spec\"]:24: in function <[string \"spec\"]:19>",
+   "Rx.combineLatest({ value = 5 }) > should execute immediately :: runtime error: [string \"spec\"]:38: attempt to index function with 'any'\nstack traceback:\n\t[string \"spec\"]:38: in function <[string \"spec\"]:33>",
+   "Rx.combineLatest({ value = Rx.of(5) }) > should execute immediately :: runtime error: [string \"spec\"]:53: attempt to index function with 'any'\nstack traceback:\n\t[string \"spec\"]:53: in function <[string \"spec\"]:48>"
+  ],
+  "passed": 0
+ },
+ {
+  "pkg": "promise",
+  "spec": "Promise.spec.lua",
+  "file": "<repo>/src/promise/src/Shared/Promise.spec.lua",
+  "ms": 10854,
+  "failed": 1,
+  "failures": [
+   "Promise._toHumanReadable > JSON-encodes a plain table instead of returning its address :: runtime error: [string \"spec\"]:601: expected table: 0x000001dd0df80470 to equal {\"code\":500}\nstack traceback:\n\t[C]: in function 'error'\n\t<local>"
+  ],
+  "passed": 62
+ },
+ {
+  "pkg": "promise",
+  "spec": "PromiseRetryUtils.spec.lua",
+  "file": "<repo>/src/promise/src/Shared/PromiseRetryUtils.spec.lua",
+  "ms": 5843,
+  "failed": 0,
+  "failures": {},
+  "passed": 5
+ },
+ {
+  "pkg": "promise",
+  "spec": "PromiseTestUtils.spec.lua",
+  "file": "<repo>/src/promise/src/Shared/PromiseTestUtils.spec.lua",
+  "ms": 5747,
+  "failed": 0,
+  "failures": {},
+  "passed": 9
+ },
+ {
+  "pkg": "promise",
+  "spec": "PromiseUtils.spec.lua",
+  "file": "<repo>/src/promise/src/Shared/PromiseUtils.spec.lua",
+  "ms": 10827,
+  "failed": 2,
+  "failures": [
+   "PromiseUtils.fromSignal > resolves when the signal fires :: runtime error: [string \"Signal\"]:81: attempt to call a nil value\nstack traceback:\n\t[string \"Signal\"]:81: in function 'new'\n\t[string \"Signal\"]:192: in function 'Connect'\n\t[string \"PromiseUtils\"]:249: in function 'fromSignal'\n\t[string \"spec\"]:226: in function <[string \"spec\"]:224>",
+   "PromiseUtils.fromSignal > disconnects the signal once settled :: runtime error: [string \"Signal\"]:81: attempt to call a nil value\nstack traceback:\n\t[string \"Signal\"]:81: in function 'new'\n\t[string \"Signal\"]:192: in function 'Connect'\n\t[string \"PromiseUtils\"]:249: in function 'fromSignal'\n\t[string \"spec\"]:240: in function <[string \"spec\"]:238>"
+  ],
+  "passed": 25
+ },
+ {
+  "pkg": "promise",
+  "spec": "PendingPromiseTracker.spec.lua",
+  "file": "<repo>/src/promise/src/Shared/Utility/PendingPromiseTracker.spec.lua",
+  "ms": 782,
+  "failed": 0,
+  "failures": {},
+  "passed": 6
+ },
+ {
+  "pkg": "promise",
+  "spec": "promiseChild.spec.lua",
+  "file": "<repo>/src/promise/src/Shared/Utility/promiseChild.spec.lua",
+  "ms": 10824,
+  "failed": 0,
+  "failures": {},
+  "passed": 3
+ },
+ {
+  "pkg": "promise",
+  "spec": "PromiseInstanceUtils.spec.lua",
+  "file": "<repo>/src/promise/src/Shared/Utility/PromiseInstanceUtils.spec.lua",
+  "ms": 833,
+  "failed": 2,
+  "failures": [
+   "PromiseInstanceUtils.promiseRemoved > is pending while the instance stays parented :: runtime error: AncestryChanged is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"PromiseInstanceUtils\"]:25: in function 'promiseRemoved'\n\t[string \"spec\"]:23: in function <[string \"spec\"]:19>\n",
+   "PromiseInstanceUtils.promiseRemoved > resolves when the instance is removed from the game :: runtime error: AncestryChanged is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"PromiseInstanceUtils\"]:25: in function 'promiseRemoved'\n\t[string \"spec\"]:33: in function <[string \"spec\"]:29>\n"
+  ],
+  "passed": 0
+ },
+ {
+  "pkg": "promise",
+  "spec": "promisePropertyValue.spec.lua",
+  "file": "<repo>/src/promise/src/Shared/Utility/promisePropertyValue.spec.lua",
+  "ms": 750,
+  "failed": 1,
+  "failures": [
+   "promisePropertyValue > resolves once a falsy property becomes truthy :: runtime error: GetPropertyChangedSignal is not a valid member of ObjectValue\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"promisePropertyValue\"]:42: in function <[string \"promisePropertyValue\"]:24>\n\t[string \"spec\"]:39: in function <[string \"spec\"]:34>\n"
+  ],
+  "passed": 1
+ },
+ {
+  "pkg": "promise",
+  "spec": "promiseWait.spec.lua",
+  "file": "<repo>/src/promise/src/Shared/Utility/promiseWait.spec.lua",
+  "ms": 10842,
+  "failed": 0,
+  "failures": {},
+  "passed": 2
+ },
+ {
+  "pkg": "throttle",
+  "spec": "ThrottledFunction.spec.lua",
+  "file": "<repo>/src/throttle/src/Shared/ThrottledFunction.spec.lua",
+  "ms": 844,
+  "failed": 0,
+  "failures": {},
+  "passed": 5
+ },
+ {
+  "pkg": "steputils",
+  "spec": "onRenderStepFrame.spec.lua",
+  "file": "<repo>/src/steputils/src/Shared/onRenderStepFrame.spec.lua",
+  "ms": 782,
+  "failed": 3,
+  "failures": [
+   "onRenderStepFrame > returns an unbind function :: runtime error: GenerateGUID is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"onRenderStepFrame\"]:22: in function <[string \"onRenderStepFrame\"]:18>\n\t[string \"spec\"]:34: in function 'bind'\n\t[string \"spec\"]:53: in function <[stri",
+   "onRenderStepFrame > tolerates a repeated unbind :: runtime error: GenerateGUID is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"onRenderStepFrame\"]:22: in function <[string \"onRenderStepFrame\"]:18>\n\t[string \"spec\"]:34: in function 'bind'\n\t[string \"spec\"]:63: in function <[stri",
+   "onRenderStepFrame > binds each call under its own key :: runtime error: GenerateGUID is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"onRenderStepFrame\"]:22: in function <[string \"onRenderStepFrame\"]:18>\n\t[string \"spec\"]:34: in function 'bind'\n\t[string \"spec\"]:76: in function <[stri"
+  ],
+  "passed": 2
+ },
+ {
+  "pkg": "steputils",
+  "spec": "onSteppedFrame.spec.lua",
+  "file": "<repo>/src/steputils/src/Shared/onSteppedFrame.spec.lua",
+  "ms": 789,
+  "failed": 3,
+  "failures": [
+   "onSteppedFrame > returns a live connection :: runtime error: Stepped is not a valid member of RunService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"onSteppedFrame\"]:19: in function <[string \"onSteppedFrame\"]:16>\n\t[string \"spec\"]:34: in function 'bind'\n\t[string \"spec\"]:53: in function <[string \"spec\"]:5",
+   "onSteppedFrame > goes dead once disconnected :: runtime error: Stepped is not a valid member of RunService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"onSteppedFrame\"]:19: in function <[string \"onSteppedFrame\"]:16>\n\t[string \"spec\"]:34: in function 'bind'\n\t[string \"spec\"]:64: in function <[string \"spec\"]:6",
+   "onSteppedFrame > tolerates a repeated disconnect :: runtime error: Stepped is not a valid member of RunService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"onSteppedFrame\"]:19: in function <[string \"onSteppedFrame\"]:16>\n\t[string \"spec\"]:34: in function 'bind'\n\t[string \"spec\"]:75: in function <[string \"spec\"]:7"
+  ],
+  "passed": 1
+ },
+ {
+  "pkg": "steputils",
+  "spec": "StepUtils.spec.lua",
+  "file": "<repo>/src/steputils/src/Shared/StepUtils.spec.lua",
+  "ms": 802,
+  "failed": 29,
+  "failures": [
+   "StepUtils.getAnimationStepSignal > returns a signal :: runtime error: IsClient is not a valid member of RunService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"StepUtils\"]:30: in function 'getAnimationStepSignal'\n\t[string \"spec\"]:95: in function <[string \"spec\"]:92>\n",
+   "StepUtils.getAnimationStepSignal > falls back to Heartbeat off a running client :: runtime error: IsClient is not a valid member of RunService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"StepUtils\"]:30: in function 'getAnimationStepSignal'\n\t[string \"spec\"]:103: in function <[string \"spec\"]:100>\n",
+   "StepUtils.getAnimationStepSignal > returns a signal that actually fires here :: runtime error: IsClient is not a valid member of RunService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"StepUtils\"]:30: in function 'getAnimationStepSignal'\n\t[string \"spec\"]:112: in function <[string \"spec\"]:108>\n",
+   "StepUtils.getSteppedSignal > returns a signal :: runtime error: IsRunning is not a valid member of RunService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"StepUtils\"]:57: in function 'getSteppedSignal'\n\t[string \"spec\"]:131: in function <[string \"spec\"]:128>\n",
+   "StepUtils.getSteppedSignal > falls back to Heartbeat on a non-running DataModel :: runtime error: IsRunning is not a valid member of RunService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"StepUtils\"]:57: in function 'getSteppedSignal'\n\t[string \"spec\"]:139: in function <[string \"spec\"]:136>\n",
+   "StepUtils.getSteppedSignal > returns a signal that actually fires here :: runtime error: IsRunning is not a valid member of RunService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"StepUtils\"]:57: in function 'getSteppedSignal'\n\t[string \"spec\"]:149: in function <[string \"spec\"]:145>\n",
+   "StepUtils.bindToSignal > invokes the update immediately on connect :: runtime error: Event is not a valid member of BindableEvent\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:170: in function <[string \"spec\"]:165>\n",
+   "StepUtils.bindToSignal > does not connect when the first update returns false :: runtime error: Event is not a valid member of BindableEvent\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:187: in function <[string \"spec\"]:182>\n",
+   "StepUtils.bindToSignal > keeps invoking the update while it returns true :: runtime error: Event is not a valid member of BindableEvent\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:206: in function <[string \"spec\"]:201>\n",
+   "StepUtils.bindToSignal > stops invoking the update once it returns false :: runtime error: Event is not a valid member of BindableEvent\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:225: in function <[string \"spec\"]:220>\n",
+   "StepUtils.bindToSignal > forwards the connect arguments to every later update :: runtime error: Event is not a valid member of BindableEvent\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:245: in function <[string \"spec\"]:240>\n",
+   "StepUtils.bindToSignal > ignores the signal's own arguments :: runtime error: Event is not a valid member of BindableEvent\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:264: in function <[string \"spec\"]:259>\n",
+   "StepUtils.bindToSignal > ignores a repeated connect while already connected :: runtime error: Event is not a valid member of BindableEvent\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:282: in function <[string \"spec\"]:277>\n",
+   "StepUtils.bindToSignal > reconnects after an explicit disconnect :: runtime error: Event is not a valid member of BindableEvent\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:300: in function <[string \"spec\"]:295>\n",
+   "StepUtils.bindToSignal > tolerates disconnect before connect and repeated disconnects :: runtime error: Event is not a valid member of BindableEvent\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:322: in function <[string \"spec\"]:318>\n",
+   "StepUtils.bindToRenderStep > drives the update off the animation step signal :: runtime error: IsClient is not a valid member of RunService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"StepUtils\"]:30: in function 'getAnimationStepSignal'\n\t[string \"StepUtils\"]:92: in function 'bindToRenderStep'\n\t[string \"spec\"]:62: in function 'bindRender",
+   "StepUtils.bindToRenderStep > does not bind when the first update returns false :: runtime error: IsClient is not a valid member of RunService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"StepUtils\"]:30: in function 'getAnimationStepSignal'\n\t[string \"StepUtils\"]:92: in function 'bindToRenderStep'\n\t[string \"spec\"]:62: in function 'bindRender",
+   "StepUtils.bindToRenderStep > stops driving the update after disconnect :: runtime error: IsClient is not a valid member of RunService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"StepUtils\"]:30: in function 'getAnimationStepSignal'\n\t[string \"StepUtils\"]:92: in function 'bindToRenderStep'\n\t[string \"spec\"]:62: in function 'bindRender",
+   "StepUtils.bindToStepped > invokes the update immediately on connect :: runtime error: Stepped is not a valid member of RunService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"StepUtils\"]:117: in function 'bindToStepped'\n\t[string \"spec\"]:68: in function 'bindStepped'\n\t[string \"spec\"]:420: in function <[string \"spec\"]:416>\n",
+   "StepUtils.bindToStepped > tolerates disconnect before connect :: runtime error: Stepped is not a valid member of RunService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"StepUtils\"]:117: in function 'bindToStepped'\n\t[string \"spec\"]:68: in function 'bindStepped'\n\t[string \"spec\"]:435: in function <[string \"spec\"]:432>\n",
+   "StepUtils.onceAtEvent > invokes the function on the next event :: runtime error: Event is not a valid member of BindableEvent\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:471: in function <[string \"spec\"]:466>\n",
+   "StepUtils.onceAtEvent > passes the event arguments through :: runtime error: Event is not a valid member of BindableEvent\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:487: in function <[string \"spec\"]:482>\n",
+   "StepUtils.onceAtEvent > only invokes the function once :: runtime error: Event is not a valid member of BindableEvent\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:503: in function <[string \"spec\"]:498>\n",
+   "StepUtils.onceAtEvent > does not invoke the function once cancelled :: runtime error: Event is not a valid member of BindableEvent\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:520: in function <[string \"spec\"]:515>\n",
+   "StepUtils.onceAtEvent > tolerates cancelling after the function ran :: runtime error: Event is not a valid member of BindableEvent\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"spec\"]:536: in function <[string \"spec\"]:532>\n",
+   "StepUtils.onceAtRenderStepped > invokes the function once on the animation step signal :: runtime error: IsClient is not a valid member of RunService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"StepUtils\"]:30: in function 'getAnimationStepSignal'\n\t[string \"StepUtils\"]:238: in function 'onceAtRenderStepped'\n\t[string \"spec\"]:564: in function <[stri",
+   "StepUtils.onceAtRenderStepped > does not invoke the function once cancelled :: runtime error: IsClient is not a valid member of RunService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"StepUtils\"]:30: in function 'getAnimationStepSignal'\n\t[string \"StepUtils\"]:238: in function 'onceAtRenderStepped'\n\t[string \"spec\"]:579: in function <[stri",
+   "StepUtils.onceAtStepped > returns a cancel function that is safe to call twice :: runtime error: Stepped is not a valid member of RunService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"StepUtils\"]:220: in function 'onceAtStepped'\n\t[string \"spec\"]:597: in function <[string \"spec\"]:593>\n",
+   "StepUtils.onceAtRenderPriority > returns a cancel function that is safe to call twice :: runtime error: GenerateGUID is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"StepUtils\"]:187: in function 'onceAtRenderPriority'\n\t[string \"spec\"]:615: in function <[string \"spec\"]:612>\n"
+  ],
+  "passed": 6
+ },
+ {
+  "pkg": "jest-utils",
+  "spec": "JestUtils.spec.lua",
+  "file": "<repo>/src/jest-utils/src/Shared/JestUtils.spec.lua",
+  "ms": 779,
+  "failed": 0,
+  "failures": {},
+  "passed": 11
+ },
+ {
+  "pkg": "instanceutils",
+  "spec": "RxInstanceUtils.spec.lua",
+  "file": "<repo>/src/instanceutils/src/Shared/RxInstanceUtils.spec.lua",
+  "ms": 799,
+  "failed": 15,
+  "failures": [
+   "RxInstanceUtils.observeChildrenBrio > should not emit anything :: runtime error: ChildAdded is not a valid member of Part\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:373: in function <[string \"RxInstanceUtils\"]:362>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:22: in function <[str",
+   "RxInstanceUtils.observeLastNamedChildBrio > with no children > should not emit anything :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:262: in function <[string \"RxInstanceUtils\"]:219>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:37: in function <[s",
+   "RxInstanceUtils.observeLastNamedChildBrio > with a matching child already present > should emit a brio with the child :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:262: in function <[string \"RxInstanceUtils\"]:219>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:59: in function <[s",
+   "RxInstanceUtils.observeLastNamedChildBrio > with wrong className > should not emit for a child with the wrong class :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:262: in function <[string \"RxInstanceUtils\"]:219>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:83: in function <[s",
+   "RxInstanceUtils.observeLastNamedChildBrio > with wrong name > should not emit for a child with the wrong name :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:262: in function <[string \"RxInstanceUtils\"]:219>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:102: in function <[",
+   "RxInstanceUtils.observeLastNamedChildBrio > when a child is added after subscription > should emit when a matching child is added :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:262: in function <[string \"RxInstanceUtils\"]:219>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:118: in function <[",
+   "RxInstanceUtils.observeLastNamedChildBrio > when a matching child is removed > should kill the previous brio :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:262: in function <[string \"RxInstanceUtils\"]:219>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:148: in function <[",
+   "RxInstanceUtils.observeLastNamedChildBrio > when child name changes to match > should emit when a child is renamed to the target name :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:262: in function <[string \"RxInstanceUtils\"]:219>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:174: in function <[",
+   "RxInstanceUtils.observeLastNamedChildBrio > when child name changes away from match > should kill the brio when a child is renamed away :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:262: in function <[string \"RxInstanceUtils\"]:219>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:201: in function <[",
+   "RxInstanceUtils.observeLastNamedChildBrio > with multiple matching children > should emit a brio with one of the children :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:262: in function <[string \"RxInstanceUtils\"]:219>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:230: in function <[",
+   "RxInstanceUtils.observeLastNamedChildBrio > with multiple matching children > should switch to remaining child when the emitted one is removed :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:262: in function <[string \"RxInstanceUtils\"]:219>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:259: in function <[",
+   "RxInstanceUtils.observeLastNamedChildBrio > with multiple matching children > should emit nothing when all matching children are removed :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:262: in function <[string \"RxInstanceUtils\"]:219>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:288: in function <[",
+   "RxInstanceUtils.observeLastNamedChildBrio > subscription cleanup > should kill the brio when subscription is destroyed :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:262: in function <[string \"RxInstanceUtils\"]:219>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:313: in function <[",
+   "RxInstanceUtils.observeLastNamedChildBrio > className inheritance > should match subclasses via IsA :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:262: in function <[string \"RxInstanceUtils\"]:219>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:337: in function <[",
+   "RxInstanceUtils.observeLastNamedChildBrio > non-matching child added then removed > should not emit for non-matching children :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:262: in function <[string \"RxInstanceUtils\"]:219>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:354: in function <["
+  ],
+  "passed": 0
+ },
+ {
+  "pkg": "randomutils",
+  "spec": "RandomUtils.spec.lua",
+  "file": "<repo>/src/randomutils/src/Shared/RandomUtils.spec.lua",
+  "ms": 757,
+  "failed": 2,
+  "failures": [
+   " > computes the gaussian random function :: runtime error: [string \"spec\"]:36: attempt to index function with 'any'\nstack traceback:\n\t[string \"spec\"]:36: in function <[string \"spec\"]:32>",
+   " > returns a random unit Vector3 :: runtime error: [string \"spec\"]:42: attempt to index function with 'any'\nstack traceback:\n\t[string \"spec\"]:42: in function <[string \"spec\"]:39>"
+  ],
+  "passed": 3
+ },
+ {
+  "pkg": "servicebag",
+  "spec": "ServiceBag.spec.lua",
+  "file": "<repo>/src/servicebag/src/Shared/ServiceBag.spec.lua",
+  "ms": 753,
+  "failed": 0,
+  "failures": {},
+  "passed": 13
+ },
+ {
+  "pkg": "tie",
+  "spec": "TiePropertyInterface.spec.lua",
+  "file": "<repo>/src/tie/src/Shared/Members/Properties/TiePropertyInterface.spec.lua",
+  "ms": 774,
+  "failed": 25,
+  "failures": [
+   "TiePropertyInterface.Value get > reads an attribute-backed value :: runtime error: Instance has been destroyed\nstack traceback:\n\t[C]: in ?\n\t[string \"TiePropertyImplementation\"]:39: in function <[string \"TiePropertyImplementation\"]:37>\n\t[string \"Maid\"]:267: in function 'DoCleaning'\n\t[string \"BaseObject\"]:40: in function 'Destroy'\n\t[string \"Maid\"]:269: in function 'Do",
+   "TiePropertyInterface.Value get > reads a value-object-backed value :: runtime error: OnInvoke is not a valid member of Score\nstack traceback:\n\t[C]: in ?\n\t[string \"TiePropertyImplementation\"]:98: in function '_updateImplementation'\n\t[string \"TiePropertyImplementation\"]:74: in function 'SetImplementation'\n\t[string \"TiePropertyImplementation\"]:50: in function 'new'\n\t[str",
+   "TiePropertyInterface.Value set > updates an attribute-backed value in place :: runtime error: Instance has been destroyed\nstack traceback:\n\t[C]: in ?\n\t[string \"TiePropertyImplementation\"]:39: in function <[string \"TiePropertyImplementation\"]:37>\n\t[string \"Maid\"]:267: in function 'DoCleaning'\n\t[string \"BaseObject\"]:40: in function 'Destroy'\n\t[string \"Maid\"]:269: in function 'Do",
+   "TiePropertyInterface.Value set > writes through to the underlying value object :: runtime error: OnInvoke is not a valid member of Score\nstack traceback:\n\t[C]: in ?\n\t[string \"TiePropertyImplementation\"]:98: in function '_updateImplementation'\n\t[string \"TiePropertyImplementation\"]:74: in function 'SetImplementation'\n\t[string \"TiePropertyImplementation\"]:50: in function 'new'\n\t[str",
+   "TiePropertyInterface.Value set > creates a value base child for a non-attribute value :: runtime error: Instance has been destroyed\nstack traceback:\n\t[C]: in ?\n\t[string \"TiePropertyImplementation\"]:39: in function <[string \"TiePropertyImplementation\"]:37>\n\t[string \"Maid\"]:267: in function 'DoCleaning'\n\t[string \"BaseObject\"]:40: in function 'Destroy'\n\t[string \"Maid\"]:269: in function 'Do",
+   "TiePropertyInterface.Value set > replaces a value base child with an attribute when set to an attribute value :: runtime error: Instance has been destroyed\nstack traceback:\n\t[C]: in ?\n\t[string \"TiePropertyImplementation\"]:39: in function <[string \"TiePropertyImplementation\"]:37>\n\t[string \"Maid\"]:267: in function 'DoCleaning'\n\t[string \"BaseObject\"]:40: in function 'Destroy'\n\t[string \"Maid\"]:269: in function 'Do",
+   "TiePropertyInterface.Value set > errors when set to an unsupported value type :: runtime error: Instance has been destroyed\nstack traceback:\n\t[C]: in ?\n\t[string \"TiePropertyImplementation\"]:39: in function <[string \"TiePropertyImplementation\"]:37>\n\t[string \"Maid\"]:267: in function 'DoCleaning'\n\t[string \"BaseObject\"]:40: in function 'Destroy'\n\t[string \"Maid\"]:269: in function 'Do",
+   "TiePropertyInterface.Value set > stores nil as an empty ObjectValue member :: runtime error: Failed to convert from 'nil' into 'Ref'\nstack traceback:\n\t[C]: in ?\n\t[string \"TiePropertyInterface\"]:335: in function <[string \"TiePropertyInterface\"]:291>\n\t[string \"spec\"]:245: in function <[string \"spec\"]:236>\n",
+   "TiePropertyInterface.Changed > fires when an attribute-backed value changes :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:373: in function <[string \"RxInstanceUtils\"]:362>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"Rx\"]:1204: in function <[s",
+   "TiePropertyInterface.Changed > fires when a value-object-backed value changes :: runtime error: OnInvoke is not a valid member of Score\nstack traceback:\n\t[C]: in ?\n\t[string \"TiePropertyImplementation\"]:98: in function '_updateImplementation'\n\t[string \"TiePropertyImplementation\"]:74: in function 'SetImplementation'\n\t[string \"TiePropertyImplementation\"]:50: in function 'new'\n\t[str",
+   "TiePropertyInterface.Changed > does not fire for the initial value :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:373: in function <[string \"RxInstanceUtils\"]:362>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"Rx\"]:1204: in function <[s",
+   "TiePropertyInterface.Changed > cannot be assigned :: runtime error: Instance has been destroyed\nstack traceback:\n\t[C]: in ?\n\t[string \"TiePropertyImplementation\"]:39: in function <[string \"TiePropertyImplementation\"]:37>\n\t[string \"Maid\"]:267: in function 'DoCleaning'\n\t[string \"BaseObject\"]:40: in function 'Destroy'\n\t[string \"Maid\"]:269: in function 'Do",
+   "TiePropertyInterface.Observe > emits the current value on subscribe :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:373: in function <[string \"RxInstanceUtils\"]:362>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"Rx\"]:1204: in function <[s",
+   "TiePropertyInterface.Observe > emits updates as the value changes :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:373: in function <[string \"RxInstanceUtils\"]:362>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"Rx\"]:1204: in function <[s",
+   "TiePropertyInterface.Observe > dedupes consecutive identical values :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:373: in function <[string \"RxInstanceUtils\"]:362>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"Rx\"]:1204: in function <[s",
+   "TiePropertyInterface.Observe > emits nil when the implementation is removed :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:373: in function <[string \"RxInstanceUtils\"]:362>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"Rx\"]:1204: in function <[s",
+   "TiePropertyInterface.ObserveBrio > emits the current attribute-backed value :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:373: in function <[string \"RxInstanceUtils\"]:362>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"Rx\"]:1204: in function <[s",
+   "TiePropertyInterface.ObserveBrio > emits the current value-object-backed value :: runtime error: OnInvoke is not a valid member of Score\nstack traceback:\n\t[C]: in ?\n\t[string \"TiePropertyImplementation\"]:98: in function '_updateImplementation'\n\t[string \"TiePropertyImplementation\"]:74: in function 'SetImplementation'\n\t[string \"TiePropertyImplementation\"]:50: in function 'new'\n\t[str",
+   "TiePropertyInterface.ObserveBrio > applies the predicate filter :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:373: in function <[string \"RxInstanceUtils\"]:362>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"Rx\"]:1204: in function <[s",
+   "TiePropertyInterface.ObserveBrio > emits nothing, instead of erroring, while the container exists but the property is unimplemented :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:373: in function <[string \"RxInstanceUtils\"]:362>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"Rx\"]:1204: in function <[s",
+   "TiePropertyInterface.ObserveBrio > keeps the subscription alive when the implementation member is removed mid-observation :: runtime error: OnInvoke is not a valid member of Score\nstack traceback:\n\t[C]: in ?\n\t[string \"TiePropertyImplementation\"]:98: in function '_updateImplementation'\n\t[string \"TiePropertyImplementation\"]:74: in function 'SetImplementation'\n\t[string \"TiePropertyImplementation\"]:50: in function 'new'\n\t[str",
+   "TiePropertyInterface.ObserveBrio > stops emitting when an attribute-backed value is cleared, without erroring :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:373: in function <[string \"RxInstanceUtils\"]:362>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"Rx\"]:1204: in function <[s",
+   "TiePropertyInterface.ObserveBrio > re-emits when the property is implemented again after removal :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:373: in function <[string \"RxInstanceUtils\"]:362>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"Rx\"]:1204: in function <[s",
+   "TiePropertyInterface indexing > errors when reading an unknown member :: runtime error: Instance has been destroyed\nstack traceback:\n\t[C]: in ?\n\t[string \"TiePropertyImplementation\"]:39: in function <[string \"TiePropertyImplementation\"]:37>\n\t[string \"Maid\"]:267: in function 'DoCleaning'\n\t[string \"BaseObject\"]:40: in function 'Destroy'\n\t[string \"Maid\"]:269: in function 'Do",
+   "TiePropertyInterface indexing > errors when assigning an unknown member :: runtime error: Instance has been destroyed\nstack traceback:\n\t[C]: in ?\n\t[string \"TiePropertyImplementation\"]:39: in function <[string \"TiePropertyImplementation\"]:37>\n\t[string \"Maid\"]:267: in function 'DoCleaning'\n\t[string \"BaseObject\"]:40: in function 'Destroy'\n\t[string \"Maid\"]:269: in function 'Do"
+  ],
+  "passed": 5
+ },
+ {
+  "pkg": "tie",
+  "spec": "TieRealmService.spec.lua",
+  "file": "<repo>/src/tie/src/Shared/Services/TieRealmService.spec.lua",
+  "ms": 785,
+  "failed": 1,
+  "failures": [
+   "TieRealmService.GetTieRealm > infers a realm when it was not told one :: runtime error: [string \"spec\"]:57: [never] expected nil to be nil\nstack traceback:\n\t[C]: in function 'error'\n\t<local>"
+  ],
+  "passed": 4
+ },
+ {
+  "pkg": "tie",
+  "spec": "TieDefinition.spec.lua",
+  "file": "<repo>/src/tie/src/Shared/TieDefinition.spec.lua",
+  "ms": 769,
+  "failed": 8,
+  "failures": [
+   "TieDefinition:ObserveFirstAncestorImplementationBrio > emits nothing when no ancestor implements :: runtime error: AncestryChanged is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"TieDefinition\"]:451: in function <[string \"TieDefinition\"]:406>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:55: in function 'o",
+   "TieDefinition:ObserveFirstAncestorImplementationBrio > emits an implementation on the parent :: runtime error: OnInvoke is not a valid member of GetScore\nstack traceback:\n\t[C]: in ?\n\t[string \"TieMethodImplementation\"]:60: in function 'SetImplementation'\n\t[string \"TieMethodImplementation\"]:44: in function 'new'\n\t[string \"TieMethodDefinition\"]:50: in function 'Implement'\n\t[string \"TieImplementat",
+   "TieDefinition:ObserveFirstAncestorImplementationBrio > emits an implementation further up the chain :: runtime error: OnInvoke is not a valid member of GetScore\nstack traceback:\n\t[C]: in ?\n\t[string \"TieMethodImplementation\"]:60: in function 'SetImplementation'\n\t[string \"TieMethodImplementation\"]:44: in function 'new'\n\t[string \"TieMethodDefinition\"]:50: in function 'Implement'\n\t[string \"TieImplementat",
+   "TieDefinition:ObserveFirstAncestorImplementationBrio > emits the nearest ancestor when several implement :: runtime error: OnInvoke is not a valid member of GetScore\nstack traceback:\n\t[C]: in ?\n\t[string \"TieMethodImplementation\"]:60: in function 'SetImplementation'\n\t[string \"TieMethodImplementation\"]:44: in function 'new'\n\t[string \"TieMethodDefinition\"]:50: in function 'Implement'\n\t[string \"TieImplementat",
+   "TieDefinition:ObserveFirstAncestorImplementationBrio > ignores an implementation on the instance itself :: runtime error: OnInvoke is not a valid member of GetScore\nstack traceback:\n\t[C]: in ?\n\t[string \"TieMethodImplementation\"]:60: in function 'SetImplementation'\n\t[string \"TieMethodImplementation\"]:44: in function 'new'\n\t[string \"TieMethodDefinition\"]:50: in function 'Implement'\n\t[string \"TieImplementat",
+   "TieDefinition:ObserveFirstAncestorImplementationBrio > emits an implementation added after subscribing :: runtime error: AncestryChanged is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"TieDefinition\"]:451: in function <[string \"TieDefinition\"]:406>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:55: in function 'o",
+   "TieDefinition:ObserveFirstAncestorImplementationBrio > falls back to the next ancestor when the nearest one is removed :: runtime error: OnInvoke is not a valid member of GetScore\nstack traceback:\n\t[C]: in ?\n\t[string \"TieMethodImplementation\"]:60: in function 'SetImplementation'\n\t[string \"TieMethodImplementation\"]:44: in function 'new'\n\t[string \"TieMethodDefinition\"]:50: in function 'Implement'\n\t[string \"TieImplementat",
+   "TieDefinition:ObserveFirstAncestorImplementationBrio > re-emits when the instance is reparented under another implementation :: runtime error: OnInvoke is not a valid member of GetScore\nstack traceback:\n\t[C]: in ?\n\t[string \"TieMethodImplementation\"]:60: in function 'SetImplementation'\n\t[string \"TieMethodImplementation\"]:44: in function 'new'\n\t[string \"TieMethodDefinition\"]:50: in function 'Implement'\n\t[string \"TieImplementat"
+  ],
+  "passed": 0
+ },
+ {
+  "pkg": "tie",
+  "spec": "TieImplementation.spec.lua",
+  "file": "<repo>/src/tie/src/Shared/TieImplementation.spec.lua",
+  "ms": 771,
+  "failed": 7,
+  "failures": [
+   "TieImplementation member realms > does not create members for the other realm on a client implementation :: runtime error: OnInvoke is not a valid member of ClientMethod\nstack traceback:\n\t[C]: in ?\n\t[string \"TieMethodImplementation\"]:60: in function 'SetImplementation'\n\t[string \"TieMethodImplementation\"]:44: in function 'new'\n\t[string \"TieMethodDefinition\"]:50: in function 'Implement'\n\t[string \"TieImpleme",
+   "TieImplementation member realms > does not create members for the other realm on a server implementation :: runtime error: OnInvoke is not a valid member of ServerMethod\nstack traceback:\n\t[C]: in ?\n\t[string \"TieMethodImplementation\"]:60: in function 'SetImplementation'\n\t[string \"TieMethodImplementation\"]:44: in function 'new'\n\t[string \"TieMethodDefinition\"]:50: in function 'Implement'\n\t[string \"TieImpleme",
+   "TieImplementation member realms > creates members for both realms on a shared implementation :: runtime error: OnInvoke is not a valid member of ServerMethod\nstack traceback:\n\t[C]: in ?\n\t[string \"TieMethodImplementation\"]:60: in function 'SetImplementation'\n\t[string \"TieMethodImplementation\"]:44: in function 'new'\n\t[string \"TieMethodDefinition\"]:50: in function 'Implement'\n\t[string \"TieImpleme",
+   "TieImplementation member realms > still creates shared properties on a client implementation :: runtime error: OnInvoke is not a valid member of ClientMethod\nstack traceback:\n\t[C]: in ?\n\t[string \"TieMethodImplementation\"]:60: in function 'SetImplementation'\n\t[string \"TieMethodImplementation\"]:44: in function 'new'\n\t[string \"TieMethodDefinition\"]:50: in function 'Implement'\n\t[string \"TieImpleme",
+   "TieImplementation member realms > errors when assigning a member from the other realm after construction :: runtime error: OnInvoke is not a valid member of ClientMethod\nstack traceback:\n\t[C]: in ?\n\t[string \"TieMethodImplementation\"]:60: in function 'SetImplementation'\n\t[string \"TieMethodImplementation\"]:44: in function 'new'\n\t[string \"TieMethodDefinition\"]:50: in function 'Implement'\n\t[string \"TieImpleme",
+   "TieImplementation member realms > errors when reading a member from the other realm :: runtime error: OnInvoke is not a valid member of ClientMethod\nstack traceback:\n\t[C]: in ?\n\t[string \"TieMethodImplementation\"]:60: in function 'SetImplementation'\n\t[string \"TieMethodImplementation\"]:44: in function 'new'\n\t[string \"TieMethodDefinition\"]:50: in function 'Implement'\n\t[string \"TieImpleme",
+   "TieImplementation member realms > is still a valid implementation in its own realm :: runtime error: OnInvoke is not a valid member of ClientMethod\nstack traceback:\n\t[C]: in ?\n\t[string \"TieMethodImplementation\"]:60: in function 'SetImplementation'\n\t[string \"TieMethodImplementation\"]:44: in function 'new'\n\t[string \"TieMethodDefinition\"]:50: in function 'Implement'\n\t[string \"TieImpleme"
+  ],
+  "passed": 1
+ },
+ {
+  "pkg": "tie",
+  "spec": "TieInterface.spec.lua",
+  "file": "<repo>/src/tie/src/Shared/TieInterface.spec.lua",
+  "ms": 839,
+  "failed": 7,
+  "failures": [
+   "TieInterface.IsImplemented with an implParent only > returns true for a valid implementation :: runtime error: OnInvoke is not a valid member of GetScore\nstack traceback:\n\t[C]: in ?\n\t[string \"TieMethodImplementation\"]:60: in function 'SetImplementation'\n\t[string \"TieMethodImplementation\"]:44: in function 'new'\n\t[string \"TieMethodDefinition\"]:50: in function 'Implement'\n\t[string \"TieImplementat",
+   "TieInterface.IsImplemented with an implParent only > returns false when a required member is missing :: runtime error: OnInvoke is not a valid member of GetScore\nstack traceback:\n\t[C]: in ?\n\t[string \"TieMethodImplementation\"]:60: in function 'SetImplementation'\n\t[string \"TieMethodImplementation\"]:44: in function 'new'\n\t[string \"TieMethodDefinition\"]:50: in function 'Implement'\n\t[string \"TieImplementat",
+   "TieInterface.IsImplemented with an implParent and an adornee > returns true for a valid implementation on the adornee :: runtime error: OnInvoke is not a valid member of GetScore\nstack traceback:\n\t[C]: in ?\n\t[string \"TieMethodImplementation\"]:60: in function 'SetImplementation'\n\t[string \"TieMethodImplementation\"]:44: in function 'new'\n\t[string \"TieMethodDefinition\"]:50: in function 'Implement'\n\t[string \"TieImplementat",
+   "TieInterface.IsImplemented with an adornee only > returns true when the adornee has an implementation :: runtime error: OnInvoke is not a valid member of GetScore\nstack traceback:\n\t[C]: in ?\n\t[string \"TieMethodImplementation\"]:60: in function 'SetImplementation'\n\t[string \"TieMethodImplementation\"]:44: in function 'new'\n\t[string \"TieMethodDefinition\"]:50: in function 'Implement'\n\t[string \"TieImplementat",
+   "TieInterface.ObserveIsImplemented > emits for an implParent on an adornee :: runtime error: GetPropertyChangedSignal is not a valid member of TieInterfaceTest\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:188: in function <[string \"RxInstanceUtils\"]:160>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"Rx",
+   "TieInterface.ObserveIsImplemented > emits for an implParent alone :: runtime error: [string \"Signal\"]:81: attempt to call a nil value\nstack traceback:\n\t[string \"Signal\"]:81: in function 'new'\n\t[string \"Signal\"]:192: in function 'Connect'\n\t[string \"TieDefinition\"]:716: in function <[string \"TieDefinition\"]:706>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[str",
+   "TieInterface.ObserveIsImplemented > emits for an adornee alone :: runtime error: ChildAdded is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxInstanceUtils\"]:373: in function <[string \"RxInstanceUtils\"]:362>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"Rx\"]:1204: in function <[s"
+  ],
+  "passed": 9
+ },
+ {
+  "pkg": "tie",
+  "spec": "TieUtils.spec.lua",
+  "file": "<repo>/src/tie/src/Shared/Utils/TieUtils.spec.lua",
+  "ms": 758,
+  "failed": 0,
+  "failures": {},
+  "passed": 5
+ },
+ {
+  "pkg": "attributeutils",
+  "spec": "AttributeUtils.spec.lua",
+  "file": "<repo>/src/attributeutils/src/Shared/AttributeUtils.spec.lua",
+  "ms": 751,
+  "failed": 3,
+  "failures": [
+   "AttributeUtils.promiseAttribute() > resolves once the attribute is set :: runtime error: GetAttributeChangedSignal is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"AttributeUtils\"]:120: in function 'promiseAttribute'\n\t[string \"spec\"]:152: in function <[string \"spec\"]:148>\n",
+   "AttributeUtils.promiseAttribute() > waits for a value the predicate accepts :: runtime error: GetAttributeChangedSignal is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"AttributeUtils\"]:120: in function 'promiseAttribute'\n\t[string \"spec\"]:168: in function <[string \"spec\"]:164>\n",
+   "AttributeUtils.promiseAttribute() > rejects when the cancel token cancels :: runtime error: [string \"Signal\"]:81: attempt to call a nil value\nstack traceback:\n\t[string \"Signal\"]:81: in function 'new'\n\t[string \"Signal\"]:192: in function 'Connect'\n\t[string \"AttributeUtils\"]:115: in function 'promiseAttribute'\n\t[string \"spec\"]:191: in function <[string \"spec\"]:185>"
+  ],
+  "passed": 12
+ },
+ {
+  "pkg": "attributeutils",
+  "spec": "AttributeValue.spec.lua",
+  "file": "<repo>/src/attributeutils/src/Shared/AttributeValue.spec.lua",
+  "ms": 766,
+  "failed": 7,
+  "failures": [
+   "AttributeValue.Changed > fires when the attribute changes :: runtime error: GetAttributeChangedSignal is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"AttributeValue\"]:132: in function '__index'\n\t[string \"spec\"]:149: in function <[string \"spec\"]:142>\n",
+   "AttributeValue:Observe() > fires the current value and every change :: runtime error: GetAttributeChangedSignal is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxAttributeUtils\"]:44: in function <[string \"RxAttributeUtils\"]:34>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:28: ",
+   "AttributeValue:Observe() > fires the default value once the attribute is cleared :: runtime error: GetAttributeChangedSignal is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxAttributeUtils\"]:44: in function <[string \"RxAttributeUtils\"]:34>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:28: ",
+   "AttributeValue:Observe() > fires nil when there is no default value :: runtime error: GetAttributeChangedSignal is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxAttributeUtils\"]:44: in function <[string \"RxAttributeUtils\"]:34>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:219:",
+   "AttributeValue:ObserveBrio() > emits a brio for the current value :: runtime error: GetAttributeChangedSignal is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxAttributeUtils\"]:168: in function <[string \"RxAttributeUtils\"]:141>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:28",
+   "AttributeValue:ObserveBrio() > kills the last brio when the value changes :: runtime error: GetAttributeChangedSignal is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxAttributeUtils\"]:168: in function <[string \"RxAttributeUtils\"]:141>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:28",
+   "AttributeValue:ObserveBrio() > skips values the condition rejects :: runtime error: GetAttributeChangedSignal is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxAttributeUtils\"]:168: in function <[string \"RxAttributeUtils\"]:141>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:28"
+  ],
+  "passed": 12
+ },
+ {
+  "pkg": "attributeutils",
+  "spec": "EncodedAttributeValue.spec.lua",
+  "file": "<repo>/src/attributeutils/src/Shared/EncodedAttributeValue.spec.lua",
+  "ms": 752,
+  "failed": 7,
+  "failures": [
+   "EncodedAttributeValue.Changed > fires when the attribute changes :: runtime error: GetAttributeChangedSignal is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"EncodedAttributeValue\"]:149: in function '__index'\n\t[string \"spec\"]:160: in function <[string \"spec\"]:153>\n",
+   "EncodedAttributeValue:Observe() > fires the decoded value and every change :: runtime error: GetAttributeChangedSignal is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxAttributeUtils\"]:44: in function <[string \"RxAttributeUtils\"]:34>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"Rx\"]:912: i",
+   "EncodedAttributeValue:Observe() > fires the default value once the attribute is cleared :: runtime error: GetAttributeChangedSignal is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxAttributeUtils\"]:44: in function <[string \"RxAttributeUtils\"]:34>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"Rx\"]:912: i",
+   "EncodedAttributeValue:Observe() > fires nil when there is no default value :: runtime error: GetAttributeChangedSignal is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxAttributeUtils\"]:44: in function <[string \"RxAttributeUtils\"]:34>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"Rx\"]:912: i",
+   "EncodedAttributeValue:ObserveBrio() > emits a brio with the decoded value :: runtime error: GetAttributeChangedSignal is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxAttributeUtils\"]:168: in function <[string \"RxAttributeUtils\"]:141>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"Rx\"]:912:",
+   "EncodedAttributeValue:ObserveBrio() > kills the last brio when the value changes :: runtime error: GetAttributeChangedSignal is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxAttributeUtils\"]:168: in function <[string \"RxAttributeUtils\"]:141>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"Rx\"]:912:",
+   "EncodedAttributeValue:ObserveBrio() > skips encoded values the condition rejects :: runtime error: GetAttributeChangedSignal is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxAttributeUtils\"]:168: in function <[string \"RxAttributeUtils\"]:141>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"Rx\"]:912:"
+  ],
+  "passed": 12
+ },
+ {
+  "pkg": "attributeutils",
+  "spec": "JSONAttributeValue.spec.lua",
+  "file": "<repo>/src/attributeutils/src/Shared/JSONAttributeValue.spec.lua",
+  "ms": 764,
+  "failed": 8,
+  "failures": [
+   "JSONAttributeValue.new() > encodes the default value onto the object :: runtime error: JSONEncode is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"JSONAttributeValue\"]:40: in function '_encode'\n\t[string \"EncodedAttributeValue\"]:91: in function 'new'\n\t[string \"JSONAttributeValue\"]:29: in function '",
+   "JSONAttributeValue.Value > round trips a dictionary :: runtime error: JSONEncode is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"JSONAttributeValue\"]:40: in function '_encode'\n\t[string \"EncodedAttributeValue\"]:91: in function 'new'\n\t[string \"JSONAttributeValue\"]:29: in function '",
+   "JSONAttributeValue.Value > round trips a list :: runtime error: JSONEncode is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"JSONAttributeValue\"]:40: in function '_encode'\n\t[string \"EncodedAttributeValue\"]:91: in function 'new'\n\t[string \"JSONAttributeValue\"]:29: in function '",
+   "JSONAttributeValue.Value > decodes what another writer stored :: runtime error: JSONEncode is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"JSONAttributeValue\"]:40: in function '_encode'\n\t[string \"EncodedAttributeValue\"]:91: in function 'new'\n\t[string \"JSONAttributeValue\"]:29: in function '",
+   "JSONAttributeValue.Value > falls back to the default once the attribute is cleared :: runtime error: JSONEncode is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"JSONAttributeValue\"]:40: in function '_encode'\n\t[string \"EncodedAttributeValue\"]:91: in function 'new'\n\t[string \"JSONAttributeValue\"]:29: in function '",
+   "JSONAttributeValue.Value > clears the attribute when written a value it cannot encode :: runtime error: JSONEncode is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"JSONAttributeValue\"]:40: in function '_encode'\n\t[string \"EncodedAttributeValue\"]:91: in function 'new'\n\t[string \"JSONAttributeValue\"]:29: in function '",
+   "JSONAttributeValue:Observe() > fires the decoded value and every change :: runtime error: JSONEncode is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"JSONAttributeValue\"]:40: in function '_encode'\n\t[string \"EncodedAttributeValue\"]:91: in function 'new'\n\t[string \"JSONAttributeValue\"]:29: in function '",
+   "JSONAttributeValue:Observe() > fires the default value once the attribute is cleared :: runtime error: JSONEncode is not a valid member of HttpService\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"JSONAttributeValue\"]:40: in function '_encode'\n\t[string \"EncodedAttributeValue\"]:91: in function 'new'\n\t[string \"JSONAttributeValue\"]:29: in function '"
+  ],
+  "passed": 2
+ },
+ {
+  "pkg": "attributeutils",
+  "spec": "RxAttributeUtils.spec.lua",
+  "file": "<repo>/src/attributeutils/src/Shared/RxAttributeUtils.spec.lua",
+  "ms": 625,
+  "failed": 11,
+  "failures": [
+   "RxAttributeUtils.observeAttribute() > fires the current value and every change :: runtime error: GetAttributeChangedSignal is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxAttributeUtils\"]:44: in function <[string \"RxAttributeUtils\"]:34>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:25: ",
+   "RxAttributeUtils.observeAttribute() > fires the default value while the attribute is unset :: runtime error: GetAttributeChangedSignal is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxAttributeUtils\"]:44: in function <[string \"RxAttributeUtils\"]:34>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:25: ",
+   "RxAttributeUtils.observeAttributeKeys() > fires every key that is already set :: runtime error: AttributeChanged is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxAttributeUtils\"]:110: in function <[string \"RxAttributeUtils\"]:107>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:33: in func",
+   "RxAttributeUtils.observeAttributeKeys() > fires keys as they are added :: runtime error: AttributeChanged is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxAttributeUtils\"]:110: in function <[string \"RxAttributeUtils\"]:107>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:33: in func",
+   "RxAttributeUtils.observeAttributeKeysBrio() > emits a live brio for every key that is set :: runtime error: AttributeChanged is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxAttributeUtils\"]:81: in function <[string \"RxAttributeUtils\"]:59>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:25: in functi",
+   "RxAttributeUtils.observeAttributeKeysBrio() > kills the brio once the attribute is removed :: runtime error: AttributeChanged is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxAttributeUtils\"]:81: in function <[string \"RxAttributeUtils\"]:59>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:25: in functi",
+   "RxAttributeUtils.observeAttributeKeysBrio() > keeps the same brio while the key only changes value :: runtime error: AttributeChanged is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxAttributeUtils\"]:81: in function <[string \"RxAttributeUtils\"]:59>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:25: in functi",
+   "RxAttributeUtils.observeAttributeBrio() > emits a brio for the current value :: runtime error: GetAttributeChangedSignal is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxAttributeUtils\"]:168: in function <[string \"RxAttributeUtils\"]:141>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:25",
+   "RxAttributeUtils.observeAttributeBrio() > replaces the brio when the value changes :: runtime error: GetAttributeChangedSignal is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxAttributeUtils\"]:168: in function <[string \"RxAttributeUtils\"]:141>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:25",
+   "RxAttributeUtils.observeAttributeBrio() > does not emit again for the same value :: runtime error: GetAttributeChangedSignal is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxAttributeUtils\"]:168: in function <[string \"RxAttributeUtils\"]:141>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:25",
+   "RxAttributeUtils.observeAttributeBrio() > skips values the condition rejects :: runtime error: GetAttributeChangedSignal is not a valid member of Folder\nstack traceback:\n\t[C]: in ?\n\t__mlua_index:31: in function <__mlua_index:15>\n\t[string \"RxAttributeUtils\"]:168: in function <[string \"RxAttributeUtils\"]:141>\n\t[string \"Observable\"]:179: in function 'Subscribe'\n\t[string \"spec\"]:25"
+  ],
+  "passed": 1
+ },
+ {
+  "pkg": "bindable-utils",
+  "spec": "BindableEncodingUtils.spec.lua",
+  "file": "<repo>/src/bindable-utils/src/Shared/BindableEncodingUtils.spec.lua",
+  "ms": 755,
+  "failed": 0,
+  "failures": {},
+  "passed": 5
+ },
+ {
+  "pkg": "string",
+  "spec": "String.spec.lua",
+  "file": "<repo>/src/string/src/Shared/String.spec.lua",
+  "ms": 745,
+  "failed": 0,
+  "failures": {},
+  "passed": 48
+ }
+]

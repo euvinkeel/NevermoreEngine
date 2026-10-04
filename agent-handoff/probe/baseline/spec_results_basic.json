@@ -1,0 +1,588 @@
+[
+ {
+  "pkg": "immediateutils",
+  "spec": "ImmediateHotReloadInstall.spec.lua",
+  "file": "<repo>/src/immediateutils/src/Shared/hotreload/ImmediateHotReloadInstall.spec.lua",
+  "ms": 826,
+  "failed": 15,
+  "failures": [
+   "ImmediateHotReloadInstall outside Studio play > delegates to RegisterDescendantModuleScripts :: runtime error: [string \"spec\"]:88: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:88: in function <[string \"spec\"]:87>",
+   "ImmediateHotReloadInstall live loading > registers via an execution clone on first load :: runtime error: [string \"spec\"]:76: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:76: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:110: in function <[string \"spec\"]:109>",
+   "ImmediateHotReloadInstall live loading > replaces the same scheduler name and Destroy()s the previous system once :: runtime error: [string \"spec\"]:76: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:76: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:135: in function <[string \"spec\"]:134>",
+   "ImmediateHotReloadInstall live loading > normalizes explicit names and retires the previous name on change :: runtime error: [string \"spec\"]:76: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:76: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:155: in function <[string \"spec\"]:154>",
+   "ImmediateHotReloadInstall live loading > rejects a duplicate scheduler name and keeps the first registration :: runtime error: [string \"spec\"]:76: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:76: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:179: in function <[string \"spec\"]:178>",
+   "ImmediateHotReloadInstall live loading > keeps the previous version when a candidate fails, then recovers :: runtime error: [string \"spec\"]:76: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:76: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:197: in function <[string \"spec\"]:196>",
+   "ImmediateHotReloadInstall live loading > unregisters when the canonical module is removed :: runtime error: [string \"spec\"]:76: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:76: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:226: in function <[string \"spec\"]:225>",
+   "ImmediateHotReloadInstall live loading > ignores a stale yielding require after a newer revision :: runtime error: [string \"spec\"]:76: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:76: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:243: in function <[string \"spec\"]:242>",
+   "ImmediateHotReloadInstall live loading > does not treat HotReloaded canonicals as ineligible :: runtime error: [string \"spec\"]:76: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:76: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:265: in function <[string \"spec\"]:264>",
+   "ImmediateHotReloadInstall live loading > does not register execution-clone instances as canonical systems :: runtime error: [string \"spec\"]:76: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:76: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:278: in function <[string \"spec\"]:277>",
+   "ImmediateHotReloadInstall shadow publication > discovers a late shadow tree and replaces live canonicals :: runtime error: [string \"spec\"]:76: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:76: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:297: in function <[string \"spec\"]:296>",
+   "ImmediateHotReloadInstall shadow publication > rebinds when the shadow folder is replaced :: runtime error: [string \"spec\"]:76: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:76: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:327: in function <[string \"spec\"]:326>",
+   "ImmediateHotReloadInstall shadow publication > mirrorShadow is a no-op when the live folder is not under ReplicatedStorage :: runtime error: [string \"spec\"]:365: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:365: in function <[string \"spec\"]:364>",
+   "ImmediateHotReloadInstall cleanup > runtime-first cleanup unregisters systems :: runtime error: [string \"spec\"]:76: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:76: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:374: in function <[string \"spec\"]:373>",
+   "ImmediateHotReloadInstall cleanup > scheduler-first cleanup does not error :: runtime error: [string \"spec\"]:76: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:76: in function 'makeLiveSystemsUnderRS'\n\t[string \"spec\"]:385: in function <[string \"spec\"]:384>"
+  ],
+  "passed": 0
+ },
+ {
+  "pkg": "immediateutils",
+  "spec": "ImmediateScheduler.spec.lua",
+  "file": "<repo>/src/immediateutils/src/Shared/scheduler/ImmediateScheduler.spec.lua",
+  "ms": 778,
+  "failed": 0,
+  "failures": {},
+  "passed": 3
+ },
+ {
+  "pkg": "maid",
+  "spec": "MaidTaskUtils.spec.lua",
+  "file": "<repo>/src/maid/src/Shared/MaidTaskUtils.spec.lua",
+  "ms": 773,
+  "failed": 0,
+  "failures": {},
+  "passed": 5
+ },
+ {
+  "pkg": "nevermore-test-runner",
+  "spec": "NevermoreTestResults.spec.lua",
+  "file": "<repo>/src/nevermore-test-runner/src/Server/NevermoreTestResults.spec.lua",
+  "ms": 757,
+  "failed": 0,
+  "failures": {},
+  "passed": 14
+ },
+ {
+  "pkg": "brio",
+  "spec": "BrioUtils.spec.lua",
+  "file": "<repo>/src/brio/src/Shared/BrioUtils.spec.lua",
+  "ms": 707,
+  "failed": 3,
+  "failures": [
+   "BrioUtils.flatten({}) [describe body] [string \"Signal\"]:81: attempt to call a nil value",
+   "BrioUtils.flatten with out a brio in it [describe body] [string \"Signal\"]:81: attempt to call a nil value",
+   "BrioUtils.flatten a dead brio in it > should return a brio that > is a brio :: runtime error: [string \"spec\"]:71: attempt to index function with 'any'\nstack traceback:\n\t[string \"spec\"]:71: in function <[string \"spec\"]:70>"
+  ],
+  "passed": 1
+ },
+ {
+  "pkg": "brio",
+  "spec": "RxBrioUtils.spec.lua",
+  "file": "<repo>/src/brio/src/Shared/RxBrioUtils.spec.lua",
+  "ms": 768,
+  "failed": 8,
+  "failures": [
+   "RxBrioUtils.combineLatest({}) > should execute immediately :: runtime error: [string \"Signal\"]:81: attempt to call a nil value\nstack traceback:\n\t[string \"Signal\"]:81: in function 'new'\n\t[string \"Signal\"]:192: in function 'Connect'\n\t[string \"BrioUtils\"]:133: in function 'first'\n\t[string \"BrioUtils\"]:102: in function 'flatten'\n\t[string \"Rx\"]:913: in function <[s",
+   "RxBrioUtils.combineLatest({ value = Observable(Brio(5)) }) > should execute immediately :: runtime error: [string \"Signal\"]:81: attempt to call a nil value\nstack traceback:\n\t[string \"Signal\"]:81: in function 'new'\n\t[string \"Signal\"]:192: in function 'Connect'\n\t[string \"BrioUtils\"]:127: in function 'first'\n\t[string \"BrioUtils\"]:102: in function 'flatten'\n\t[string \"Rx\"]:913: in function <[s",
+   "RxBrioUtils.flatCombineLatest [describe body] [string \"Signal\"]:81: attempt to call a nil value",
+   "RxBrioUtils.switchToBrio > should clone an input brio instead of forwarding it directly :: runtime error: [string \"Signal\"]:81: attempt to call a nil value\nstack traceback:\n\t[string \"Signal\"]:81: in function 'new'\n\t[string \"Signal\"]:192: in function 'Connect'\n\t[string \"BrioUtils\"]:33: in function 'clone'\n\t[string \"RxBrioUtils\"]:790: in function <[string \"RxBrioUtils\"]:780>\n\t[string \"Subsc",
+   "RxBrioUtils.switchToBrio > should kill clone when the source brio dies :: runtime error: [string \"Signal\"]:81: attempt to call a nil value\nstack traceback:\n\t[string \"Signal\"]:81: in function 'new'\n\t[string \"Signal\"]:192: in function 'Connect'\n\t[string \"BrioUtils\"]:33: in function 'clone'\n\t[string \"RxBrioUtils\"]:790: in function <[string \"RxBrioUtils\"]:780>\n\t[string \"Subsc",
+   "RxBrioUtils.switchToBrio > should apply predicate to unwrapped brio values :: runtime error: [string \"Signal\"]:81: attempt to call a nil value\nstack traceback:\n\t[string \"Signal\"]:81: in function 'new'\n\t[string \"Signal\"]:192: in function 'Connect'\n\t[string \"BrioUtils\"]:33: in function 'clone'\n\t[string \"RxBrioUtils\"]:790: in function <[string \"RxBrioUtils\"]:780>\n\t[string \"Subsc",
+   "RxBrioUtils.switchToBrio > should handle interleaved brio and plain value emissions :: runtime error: [string \"Signal\"]:81: attempt to call a nil value\nstack traceback:\n\t[string \"Signal\"]:81: in function 'new'\n\t[string \"Signal\"]:192: in function 'Connect'\n\t[string \"BrioUtils\"]:33: in function 'clone'\n\t[string \"RxBrioUtils\"]:790: in function <[string \"RxBrioUtils\"]:780>\n\t[string \"Subsc",
+   "RxBrioUtils.switchToBrio > should handle source brio dying while subscribed then new emission :: runtime error: [string \"Signal\"]:81: attempt to call a nil value\nstack traceback:\n\t[string \"Signal\"]:81: in function 'new'\n\t[string \"Signal\"]:192: in function 'Connect'\n\t[string \"BrioUtils\"]:33: in function 'clone'\n\t[string \"RxBrioUtils\"]:790: in function <[string \"RxBrioUtils\"]:780>\n\t[string \"Subsc"
+  ],
+  "passed": 13
+ },
+ {
+  "pkg": "rx",
+  "spec": "Rx.spec.lua",
+  "file": "<repo>/src/rx/src/Shared/Rx.spec.lua",
+  "ms": 779,
+  "failed": 3,
+  "failures": [
+   "Rx.combineLatest({}) > should execute immediately :: runtime error: [string \"spec\"]:24: attempt to index function with 'any'\nstack traceback:\n\t[string \"spec\"]:24: in function <[string \"spec\"]:19>",
+   "Rx.combineLatest({ value = 5 }) > should execute immediately :: runtime error: [string \"spec\"]:38: attempt to index function with 'any'\nstack traceback:\n\t[string \"spec\"]:38: in function <[string \"spec\"]:33>",
+   "Rx.combineLatest({ value = Rx.of(5) }) > should execute immediately :: runtime error: [string \"spec\"]:53: attempt to index function with 'any'\nstack traceback:\n\t[string \"spec\"]:53: in function <[string \"spec\"]:48>"
+  ],
+  "passed": 0
+ },
+ {
+  "pkg": "promise",
+  "spec": "Promise.spec.lua",
+  "file": "<repo>/src/promise/src/Shared/Promise.spec.lua",
+  "ms": 10869,
+  "failed": 1,
+  "failures": [
+   "Promise._toHumanReadable > JSON-encodes a plain table instead of returning its address :: runtime error: [string \"spec\"]:601: expected table: 0x0000022c31753520 to equal {\"code\":500}\nstack traceback:\n\t[C]: in function 'error'\n\t<local>"
+  ],
+  "passed": 62
+ },
+ {
+  "pkg": "promise",
+  "spec": "PromiseRetryUtils.spec.lua",
+  "file": "<repo>/src/promise/src/Shared/PromiseRetryUtils.spec.lua",
+  "ms": 5888,
+  "failed": 0,
+  "failures": {},
+  "passed": 5
+ },
+ {
+  "pkg": "promise",
+  "spec": "PromiseTestUtils.spec.lua",
+  "file": "<repo>/src/promise/src/Shared/PromiseTestUtils.spec.lua",
+  "ms": 5821,
+  "failed": 0,
+  "failures": {},
+  "passed": 9
+ },
+ {
+  "pkg": "promise",
+  "spec": "PromiseUtils.spec.lua",
+  "file": "<repo>/src/promise/src/Shared/PromiseUtils.spec.lua",
+  "ms": 10871,
+  "failed": 2,
+  "failures": [
+   "PromiseUtils.fromSignal > resolves when the signal fires :: runtime error: [string \"Signal\"]:81: attempt to call a nil value\nstack traceback:\n\t[string \"Signal\"]:81: in function 'new'\n\t[string \"Signal\"]:192: in function 'Connect'\n\t[string \"PromiseUtils\"]:249: in function 'fromSignal'\n\t[string \"spec\"]:226: in function <[string \"spec\"]:224>",
+   "PromiseUtils.fromSignal > disconnects the signal once settled :: runtime error: [string \"Signal\"]:81: attempt to call a nil value\nstack traceback:\n\t[string \"Signal\"]:81: in function 'new'\n\t[string \"Signal\"]:192: in function 'Connect'\n\t[string \"PromiseUtils\"]:249: in function 'fromSignal'\n\t[string \"spec\"]:240: in function <[string \"spec\"]:238>"
+  ],
+  "passed": 25
+ },
+ {
+  "pkg": "promise",
+  "spec": "PendingPromiseTracker.spec.lua",
+  "file": "<repo>/src/promise/src/Shared/Utility/PendingPromiseTracker.spec.lua",
+  "ms": 884,
+  "failed": 0,
+  "failures": {},
+  "passed": 6
+ },
+ {
+  "pkg": "promise",
+  "spec": "promiseChild.spec.lua",
+  "file": "<repo>/src/promise/src/Shared/Utility/promiseChild.spec.lua",
+  "ms": 788,
+  "failed": 3,
+  "failures": [
+   "promiseChild > resolves immediately when the child already exists :: runtime error: [string \"spec\"]:20: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:20: in function <[string \"spec\"]:19>",
+   "promiseChild > resolves once a matching child is added :: runtime error: [string \"spec\"]:37: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:37: in function <[string \"spec\"]:36>",
+   "promiseChild > rejects when the child never appears before the timeout :: runtime error: [string \"spec\"]:55: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:55: in function <[string \"spec\"]:54>"
+  ],
+  "passed": 0
+ },
+ {
+  "pkg": "promise",
+  "spec": "PromiseInstanceUtils.spec.lua",
+  "file": "<repo>/src/promise/src/Shared/Utility/PromiseInstanceUtils.spec.lua",
+  "ms": 786,
+  "failed": 2,
+  "failures": [
+   "PromiseInstanceUtils.promiseRemoved > is pending while the instance stays parented :: runtime error: [string \"spec\"]:20: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:20: in function <[string \"spec\"]:19>",
+   "PromiseInstanceUtils.promiseRemoved > resolves when the instance is removed from the game :: runtime error: [string \"spec\"]:30: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:30: in function <[string \"spec\"]:29>"
+  ],
+  "passed": 0
+ },
+ {
+  "pkg": "promise",
+  "spec": "promisePropertyValue.spec.lua",
+  "file": "<repo>/src/promise/src/Shared/Utility/promisePropertyValue.spec.lua",
+  "ms": 772,
+  "failed": 2,
+  "failures": [
+   "promisePropertyValue > resolves immediately when the property is already truthy :: runtime error: [string \"spec\"]:20: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:20: in function <[string \"spec\"]:19>",
+   "promisePropertyValue > resolves once a falsy property becomes truthy :: runtime error: [string \"spec\"]:35: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:35: in function <[string \"spec\"]:34>"
+  ],
+  "passed": 0
+ },
+ {
+  "pkg": "promise",
+  "spec": "promiseWait.spec.lua",
+  "file": "<repo>/src/promise/src/Shared/Utility/promiseWait.spec.lua",
+  "ms": 10812,
+  "failed": 0,
+  "failures": {},
+  "passed": 2
+ },
+ {
+  "pkg": "throttle",
+  "spec": "ThrottledFunction.spec.lua",
+  "file": "<repo>/src/throttle/src/Shared/ThrottledFunction.spec.lua",
+  "ms": 826,
+  "failed": 0,
+  "failures": {},
+  "passed": 5
+ },
+ {
+  "pkg": "steputils",
+  "spec": "onRenderStepFrame.spec.lua",
+  "file": "<repo>/src/steputils/src/Shared/onRenderStepFrame.spec.lua",
+  "ms": 801,
+  "failed": 3,
+  "failures": [
+   "onRenderStepFrame > returns an unbind function :: runtime error: [string \"spec\"]:53: attempt to index nil with 'RenderPriority'\nstack traceback:\n\t[string \"spec\"]:53: in function <[string \"spec\"]:50>",
+   "onRenderStepFrame > tolerates a repeated unbind :: runtime error: [string \"spec\"]:63: attempt to index nil with 'RenderPriority'\nstack traceback:\n\t[string \"spec\"]:63: in function <[string \"spec\"]:60>",
+   "onRenderStepFrame > binds each call under its own key :: runtime error: [string \"spec\"]:76: attempt to index nil with 'RenderPriority'\nstack traceback:\n\t[string \"spec\"]:76: in function <[string \"spec\"]:73>"
+  ],
+  "passed": 2
+ },
+ {
+  "pkg": "steputils",
+  "spec": "onSteppedFrame.spec.lua",
+  "file": "<repo>/src/steputils/src/Shared/onSteppedFrame.spec.lua",
+  "ms": 786,
+  "failed": 3,
+  "failures": [
+   "onSteppedFrame > returns a live connection :: runtime error: [string \"onSteppedFrame\"]:19: [shim] game:GetService(\"RunService\").Stepped is not available outside Roblox\nstack traceback:\n\t[C]: in function 'error'\n\t<local>",
+   "onSteppedFrame > goes dead once disconnected :: runtime error: [string \"onSteppedFrame\"]:19: [shim] game:GetService(\"RunService\").Stepped is not available outside Roblox\nstack traceback:\n\t[C]: in function 'error'\n\t<local>",
+   "onSteppedFrame > tolerates a repeated disconnect :: runtime error: [string \"onSteppedFrame\"]:19: [shim] game:GetService(\"RunService\").Stepped is not available outside Roblox\nstack traceback:\n\t[C]: in function 'error'\n\t<local>"
+  ],
+  "passed": 1
+ },
+ {
+  "pkg": "steputils",
+  "spec": "StepUtils.spec.lua",
+  "file": "<repo>/src/steputils/src/Shared/StepUtils.spec.lua",
+  "ms": 778,
+  "failed": 31,
+  "failures": [
+   "StepUtils.getAnimationStepSignal > returns a signal :: runtime error: [string \"StepUtils\"]:30: [shim] game:GetService(\"RunService\").IsClient is not available outside Roblox\nstack traceback:\n\t[C]: in function 'error'\n\t<local>",
+   "StepUtils.getAnimationStepSignal > falls back to Heartbeat off a running client :: runtime error: [string \"StepUtils\"]:30: [shim] game:GetService(\"RunService\").IsClient is not available outside Roblox\nstack traceback:\n\t[C]: in function 'error'\n\t<local>",
+   "StepUtils.getAnimationStepSignal > returns a signal that actually fires here :: runtime error: [string \"StepUtils\"]:30: [shim] game:GetService(\"RunService\").IsClient is not available outside Roblox\nstack traceback:\n\t[C]: in function 'error'\n\t<local>",
+   "StepUtils.getSteppedSignal > returns a signal :: runtime error: [string \"StepUtils\"]:57: [shim] game:GetService(\"RunService\").IsRunning is not available outside Roblox\nstack traceback:\n\t[C]: in function 'error'\n\t<local>",
+   "StepUtils.getSteppedSignal > falls back to Heartbeat on a non-running DataModel :: runtime error: [string \"StepUtils\"]:57: [shim] game:GetService(\"RunService\").IsRunning is not available outside Roblox\nstack traceback:\n\t[C]: in function 'error'\n\t<local>",
+   "StepUtils.getSteppedSignal > returns a signal that actually fires here :: runtime error: [string \"StepUtils\"]:57: [shim] game:GetService(\"RunService\").IsRunning is not available outside Roblox\nstack traceback:\n\t[C]: in function 'error'\n\t<local>",
+   "StepUtils.bindToSignal > invokes the update immediately on connect :: runtime error: [string \"spec\"]:50: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:50: in function 'newBindable'\n\t[string \"spec\"]:167: in function <[string \"spec\"]:165>",
+   "StepUtils.bindToSignal > does not connect when the first update returns false :: runtime error: [string \"spec\"]:50: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:50: in function 'newBindable'\n\t[string \"spec\"]:184: in function <[string \"spec\"]:182>",
+   "StepUtils.bindToSignal > keeps invoking the update while it returns true :: runtime error: [string \"spec\"]:50: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:50: in function 'newBindable'\n\t[string \"spec\"]:203: in function <[string \"spec\"]:201>",
+   "StepUtils.bindToSignal > stops invoking the update once it returns false :: runtime error: [string \"spec\"]:50: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:50: in function 'newBindable'\n\t[string \"spec\"]:222: in function <[string \"spec\"]:220>",
+   "StepUtils.bindToSignal > forwards the connect arguments to every later update :: runtime error: [string \"spec\"]:50: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:50: in function 'newBindable'\n\t[string \"spec\"]:242: in function <[string \"spec\"]:240>",
+   "StepUtils.bindToSignal > ignores the signal's own arguments :: runtime error: [string \"spec\"]:50: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:50: in function 'newBindable'\n\t[string \"spec\"]:261: in function <[string \"spec\"]:259>",
+   "StepUtils.bindToSignal > ignores a repeated connect while already connected :: runtime error: [string \"spec\"]:50: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:50: in function 'newBindable'\n\t[string \"spec\"]:279: in function <[string \"spec\"]:277>",
+   "StepUtils.bindToSignal > reconnects after an explicit disconnect :: runtime error: [string \"spec\"]:50: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:50: in function 'newBindable'\n\t[string \"spec\"]:297: in function <[string \"spec\"]:295>",
+   "StepUtils.bindToSignal > tolerates disconnect before connect and repeated disconnects :: runtime error: [string \"spec\"]:50: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:50: in function 'newBindable'\n\t[string \"spec\"]:320: in function <[string \"spec\"]:318>",
+   "StepUtils.bindToSignal > throws on a non-function update :: runtime error: [string \"spec\"]:50: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:50: in function 'newBindable'\n\t[string \"spec\"]:348: in function <[string \"spec\"]:346>",
+   "StepUtils.bindToRenderStep > drives the update off the animation step signal :: runtime error: [string \"StepUtils\"]:30: [shim] game:GetService(\"RunService\").IsClient is not available outside Roblox\nstack traceback:\n\t[C]: in function 'error'\n\t<local>",
+   "StepUtils.bindToRenderStep > does not bind when the first update returns false :: runtime error: [string \"StepUtils\"]:30: [shim] game:GetService(\"RunService\").IsClient is not available outside Roblox\nstack traceback:\n\t[C]: in function 'error'\n\t<local>",
+   "StepUtils.bindToRenderStep > stops driving the update after disconnect :: runtime error: [string \"StepUtils\"]:30: [shim] game:GetService(\"RunService\").IsClient is not available outside Roblox\nstack traceback:\n\t[C]: in function 'error'\n\t<local>",
+   "StepUtils.bindToStepped > invokes the update immediately on connect :: runtime error: [string \"StepUtils\"]:117: [shim] game:GetService(\"RunService\").Stepped is not available outside Roblox\nstack traceback:\n\t[C]: in function 'error'\n\t<local>",
+   "StepUtils.bindToStepped > tolerates disconnect before connect :: runtime error: [string \"StepUtils\"]:117: [shim] game:GetService(\"RunService\").Stepped is not available outside Roblox\nstack traceback:\n\t[C]: in function 'error'\n\t<local>",
+   "StepUtils.onceAtEvent > invokes the function on the next event :: runtime error: [string \"spec\"]:50: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:50: in function 'newBindable'\n\t[string \"spec\"]:468: in function <[string \"spec\"]:466>",
+   "StepUtils.onceAtEvent > passes the event arguments through :: runtime error: [string \"spec\"]:50: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:50: in function 'newBindable'\n\t[string \"spec\"]:484: in function <[string \"spec\"]:482>",
+   "StepUtils.onceAtEvent > only invokes the function once :: runtime error: [string \"spec\"]:50: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:50: in function 'newBindable'\n\t[string \"spec\"]:500: in function <[string \"spec\"]:498>",
+   "StepUtils.onceAtEvent > does not invoke the function once cancelled :: runtime error: [string \"spec\"]:50: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:50: in function 'newBindable'\n\t[string \"spec\"]:517: in function <[string \"spec\"]:515>",
+   "StepUtils.onceAtEvent > tolerates cancelling after the function ran :: runtime error: [string \"spec\"]:50: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:50: in function 'newBindable'\n\t[string \"spec\"]:534: in function <[string \"spec\"]:532>",
+   "StepUtils.onceAtEvent > throws on a non-function :: runtime error: [string \"spec\"]:50: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:50: in function 'newBindable'\n\t[string \"spec\"]:549: in function <[string \"spec\"]:547>",
+   "StepUtils.onceAtRenderStepped > invokes the function once on the animation step signal :: runtime error: [string \"StepUtils\"]:30: [shim] game:GetService(\"RunService\").IsClient is not available outside Roblox\nstack traceback:\n\t[C]: in function 'error'\n\t<local>",
+   "StepUtils.onceAtRenderStepped > does not invoke the function once cancelled :: runtime error: [string \"StepUtils\"]:30: [shim] game:GetService(\"RunService\").IsClient is not available outside Roblox\nstack traceback:\n\t[C]: in function 'error'\n\t<local>",
+   "StepUtils.onceAtStepped > returns a cancel function that is safe to call twice :: runtime error: [string \"StepUtils\"]:220: [shim] game:GetService(\"RunService\").Stepped is not available outside Roblox\nstack traceback:\n\t[C]: in function 'error'\n\t<local>",
+   "StepUtils.onceAtRenderPriority > returns a cancel function that is safe to call twice :: runtime error: [string \"spec\"]:615: attempt to index nil with 'RenderPriority'\nstack traceback:\n\t[string \"spec\"]:615: in function <[string \"spec\"]:612>"
+  ],
+  "passed": 4
+ },
+ {
+  "pkg": "jest-utils",
+  "spec": "JestUtils.spec.lua",
+  "file": "<repo>/src/jest-utils/src/Shared/JestUtils.spec.lua",
+  "ms": 784,
+  "failed": 1,
+  "failures": [
+   "JestUtils.afterThis() with a maid task [describe body] [string \"spec\"]:42: attempt to index nil with 'new'"
+  ],
+  "passed": 9
+ },
+ {
+  "pkg": "instanceutils",
+  "spec": "RxInstanceUtils.spec.lua",
+  "file": "<repo>/src/instanceutils/src/Shared/RxInstanceUtils.spec.lua",
+  "ms": 798,
+  "failed": 15,
+  "failures": [
+   "RxInstanceUtils.observeChildrenBrio [describe body] [string \"spec\"]:17: attempt to index nil with 'new'",
+   "RxInstanceUtils.observeLastNamedChildBrio > with no children > should not emit anything :: runtime error: [string \"spec\"]:33: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:33: in function <[string \"spec\"]:32>",
+   "RxInstanceUtils.observeLastNamedChildBrio > with a matching child already present > should emit a brio with the child :: runtime error: [string \"spec\"]:51: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:51: in function <[string \"spec\"]:50>",
+   "RxInstanceUtils.observeLastNamedChildBrio > with wrong className > should not emit for a child with the wrong class :: runtime error: [string \"spec\"]:76: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:76: in function <[string \"spec\"]:75>",
+   "RxInstanceUtils.observeLastNamedChildBrio > with wrong name > should not emit for a child with the wrong name :: runtime error: [string \"spec\"]:95: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:95: in function <[string \"spec\"]:94>",
+   "RxInstanceUtils.observeLastNamedChildBrio > when a child is added after subscription > should emit when a matching child is added :: runtime error: [string \"spec\"]:114: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:114: in function <[string \"spec\"]:113>",
+   "RxInstanceUtils.observeLastNamedChildBrio > when a matching child is removed > should kill the previous brio :: runtime error: [string \"spec\"]:140: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:140: in function <[string \"spec\"]:139>",
+   "RxInstanceUtils.observeLastNamedChildBrio > when child name changes to match > should emit when a child is renamed to the target name :: runtime error: [string \"spec\"]:166: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:166: in function <[string \"spec\"]:165>",
+   "RxInstanceUtils.observeLastNamedChildBrio > when child name changes away from match > should kill the brio when a child is renamed away :: runtime error: [string \"spec\"]:193: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:193: in function <[string \"spec\"]:192>",
+   "RxInstanceUtils.observeLastNamedChildBrio > with multiple matching children > should emit a brio with one of the children :: runtime error: [string \"spec\"]:219: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:219: in function <[string \"spec\"]:218>",
+   "RxInstanceUtils.observeLastNamedChildBrio > with multiple matching children > should switch to remaining child when the emitted one is removed :: runtime error: [string \"spec\"]:249: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:249: in function <[string \"spec\"]:248>",
+   "RxInstanceUtils.observeLastNamedChildBrio > with multiple matching children > should emit nothing when all matching children are removed :: runtime error: [string \"spec\"]:278: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:278: in function <[string \"spec\"]:277>",
+   "RxInstanceUtils.observeLastNamedChildBrio > subscription cleanup > should kill the brio when subscription is destroyed :: runtime error: [string \"spec\"]:306: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:306: in function <[string \"spec\"]:305>",
+   "RxInstanceUtils.observeLastNamedChildBrio > className inheritance > should match subclasses via IsA :: runtime error: [string \"spec\"]:328: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:328: in function <[string \"spec\"]:327>",
+   "RxInstanceUtils.observeLastNamedChildBrio > non-matching child added then removed > should not emit for non-matching children :: runtime error: [string \"spec\"]:351: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:351: in function <[string \"spec\"]:350>"
+  ],
+  "passed": 0
+ },
+ {
+  "pkg": "randomutils",
+  "spec": "RandomUtils.spec.lua",
+  "file": "<repo>/src/randomutils/src/Shared/RandomUtils.spec.lua",
+  "ms": 735,
+  "failed": 2,
+  "failures": [
+   " > computes the gaussian random function :: runtime error: [string \"spec\"]:33: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:33: in function <[string \"spec\"]:32>",
+   " > returns a random unit Vector3 :: runtime error: [string \"spec\"]:40: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:40: in function <[string \"spec\"]:39>"
+  ],
+  "passed": 3
+ },
+ {
+  "pkg": "servicebag",
+  "spec": "ServiceBag.spec.lua",
+  "file": "<repo>/src/servicebag/src/Shared/ServiceBag.spec.lua",
+  "ms": 775,
+  "failed": 0,
+  "failures": {},
+  "passed": 13
+ },
+ {
+  "pkg": "tie",
+  "spec": "TiePropertyInterface.spec.lua",
+  "file": "<repo>/src/tie/src/Shared/Members/Properties/TiePropertyInterface.spec.lua",
+  "ms": 671,
+  "failed": 30,
+  "failures": [
+   "TiePropertyInterface.Value get > reads an attribute-backed value :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:60: in function <[string \"spec\"]:56>",
+   "TiePropertyInterface.Value get > reads a value-object-backed value :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:74: in function <[string \"spec\"]:70>",
+   "TiePropertyInterface.Value get > prefers the attribute over a colliding child member :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:90: in function <[string \"spec\"]:86>",
+   "TiePropertyInterface.Value get > errors with a clean message when the member is unimplemented :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:113: in function <[string \"spec\"]:109>",
+   "TiePropertyInterface.Value get > errors when there is no implementation container at all :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:129: in function <[string \"spec\"]:125>",
+   "TiePropertyInterface.Value set > updates an attribute-backed value in place :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:144: in function <[string \"spec\"]:140>",
+   "TiePropertyInterface.Value set > writes through to the underlying value object :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:161: in function <[string \"spec\"]:157>",
+   "TiePropertyInterface.Value set > creates a value base child for a non-attribute value :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:180: in function <[string \"spec\"]:176>",
+   "TiePropertyInterface.Value set > replaces a value base child with an attribute when set to an attribute value :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:202: in function <[string \"spec\"]:198>",
+   "TiePropertyInterface.Value set > errors when set to an unsupported value type :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:224: in function <[string \"spec\"]:220>",
+   "TiePropertyInterface.Value set > stores nil as an empty ObjectValue member :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:240: in function <[string \"spec\"]:236>",
+   "TiePropertyInterface.Value set > errors when setting a non-attribute value without an implementation container :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:260: in function <[string \"spec\"]:256>",
+   "TiePropertyInterface.Value set > errors when setting an attribute value without an implementation container :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:276: in function <[string \"spec\"]:272>",
+   "TiePropertyInterface.Changed > fires when an attribute-backed value changes :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:291: in function <[string \"spec\"]:287>",
+   "TiePropertyInterface.Changed > fires when a value-object-backed value changes :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:314: in function <[string \"spec\"]:310>",
+   "TiePropertyInterface.Changed > does not fire for the initial value :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:337: in function <[string \"spec\"]:333>",
+   "TiePropertyInterface.Changed > cannot be assigned :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:356: in function <[string \"spec\"]:352>",
+   "TiePropertyInterface.Observe > emits the current value on subscribe :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:380: in function <[string \"spec\"]:376>",
+   "TiePropertyInterface.Observe > emits updates as the value changes :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:397: in function <[string \"spec\"]:393>",
+   "TiePropertyInterface.Observe > dedupes consecutive identical values :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:417: in function <[string \"spec\"]:413>",
+   "TiePropertyInterface.Observe > emits nil when the implementation is removed :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:437: in function <[string \"spec\"]:433>",
+   "TiePropertyInterface.ObserveBrio > emits the current attribute-backed value :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:466: in function <[string \"spec\"]:462>",
+   "TiePropertyInterface.ObserveBrio > emits the current value-object-backed value :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:483: in function <[string \"spec\"]:479>",
+   "TiePropertyInterface.ObserveBrio > applies the predicate filter :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:502: in function <[string \"spec\"]:498>",
+   "TiePropertyInterface.ObserveBrio > emits nothing, instead of erroring, while the container exists but the property is unimplemented :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:527: in function <[string \"spec\"]:523>",
+   "TiePropertyInterface.ObserveBrio > keeps the subscription alive when the implementation member is removed mid-observation :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:546: in function <[string \"spec\"]:542>",
+   "TiePropertyInterface.ObserveBrio > stops emitting when an attribute-backed value is cleared, without erroring :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:578: in function <[string \"spec\"]:574>",
+   "TiePropertyInterface.ObserveBrio > re-emits when the property is implemented again after removal :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:599: in function <[string \"spec\"]:595>",
+   "TiePropertyInterface indexing > errors when reading an unknown member :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:622: in function <[string \"spec\"]:618>",
+   "TiePropertyInterface indexing > errors when assigning an unknown member :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'newAdornee'\n\t[string \"spec\"]:638: in function <[string \"spec\"]:634>"
+  ],
+  "passed": 0
+ },
+ {
+  "pkg": "tie",
+  "spec": "TieRealmService.spec.lua",
+  "file": "<repo>/src/tie/src/Shared/Services/TieRealmService.spec.lua",
+  "ms": 781,
+  "failed": 1,
+  "failures": [
+   "TieRealmService.GetTieRealm > infers a realm when it was not told one :: runtime error: [string \"spec\"]:57: [never] expected nil to be nil\nstack traceback:\n\t[C]: in function 'error'\n\t<local>"
+  ],
+  "passed": 4
+ },
+ {
+  "pkg": "tie",
+  "spec": "TieDefinition.spec.lua",
+  "file": "<repo>/src/tie/src/Shared/TieDefinition.spec.lua",
+  "ms": 789,
+  "failed": 8,
+  "failures": [
+   "TieDefinition:ObserveFirstAncestorImplementationBrio > emits nothing when no ancestor implements :: runtime error: [string \"spec\"]:25: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:25: in function 'setup'\n\t[string \"spec\"]:78: in function <[string \"spec\"]:77>",
+   "TieDefinition:ObserveFirstAncestorImplementationBrio > emits an implementation on the parent :: runtime error: [string \"spec\"]:25: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:25: in function 'setup'\n\t[string \"spec\"]:86: in function <[string \"spec\"]:85>",
+   "TieDefinition:ObserveFirstAncestorImplementationBrio > emits an implementation further up the chain :: runtime error: [string \"spec\"]:25: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:25: in function 'setup'\n\t[string \"spec\"]:96: in function <[string \"spec\"]:95>",
+   "TieDefinition:ObserveFirstAncestorImplementationBrio > emits the nearest ancestor when several implement :: runtime error: [string \"spec\"]:25: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:25: in function 'setup'\n\t[string \"spec\"]:106: in function <[string \"spec\"]:105>",
+   "TieDefinition:ObserveFirstAncestorImplementationBrio > ignores an implementation on the instance itself :: runtime error: [string \"spec\"]:25: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:25: in function 'setup'\n\t[string \"spec\"]:117: in function <[string \"spec\"]:116>",
+   "TieDefinition:ObserveFirstAncestorImplementationBrio > emits an implementation added after subscribing :: runtime error: [string \"spec\"]:25: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:25: in function 'setup'\n\t[string \"spec\"]:127: in function <[string \"spec\"]:126>",
+   "TieDefinition:ObserveFirstAncestorImplementationBrio > falls back to the next ancestor when the nearest one is removed :: runtime error: [string \"spec\"]:25: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:25: in function 'setup'\n\t[string \"spec\"]:136: in function <[string \"spec\"]:135>",
+   "TieDefinition:ObserveFirstAncestorImplementationBrio > re-emits when the instance is reparented under another implementation :: runtime error: [string \"spec\"]:25: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:25: in function 'setup'\n\t[string \"spec\"]:148: in function <[string \"spec\"]:147>"
+  ],
+  "passed": 0
+ },
+ {
+  "pkg": "tie",
+  "spec": "TieImplementation.spec.lua",
+  "file": "<repo>/src/tie/src/Shared/TieImplementation.spec.lua",
+  "ms": 789,
+  "failed": 8,
+  "failures": [
+   "TieImplementation member realms > does not create members for the other realm on a client implementation :: runtime error: [string \"spec\"]:44: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:44: in function 'newAdornee'\n\t[string \"spec\"]:94: in function <[string \"spec\"]:91>",
+   "TieImplementation member realms > does not create members for the other realm on a server implementation :: runtime error: [string \"spec\"]:44: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:44: in function 'newAdornee'\n\t[string \"spec\"]:111: in function <[string \"spec\"]:108>",
+   "TieImplementation member realms > creates members for both realms on a shared implementation :: runtime error: [string \"spec\"]:44: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:44: in function 'newAdornee'\n\t[string \"spec\"]:126: in function <[string \"spec\"]:123>",
+   "TieImplementation member realms > still creates shared properties on a client implementation :: runtime error: [string \"spec\"]:44: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:44: in function 'newAdornee'\n\t[string \"spec\"]:143: in function <[string \"spec\"]:140>",
+   "TieImplementation member realms > errors when a client implementation supplies a server member :: runtime error: [string \"spec\"]:44: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:44: in function 'newAdornee'\n\t[string \"spec\"]:155: in function <[string \"spec\"]:152>",
+   "TieImplementation member realms > errors when assigning a member from the other realm after construction :: runtime error: [string \"spec\"]:44: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:44: in function 'newAdornee'\n\t[string \"spec\"]:169: in function <[string \"spec\"]:166>",
+   "TieImplementation member realms > errors when reading a member from the other realm :: runtime error: [string \"spec\"]:44: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:44: in function 'newAdornee'\n\t[string \"spec\"]:182: in function <[string \"spec\"]:179>",
+   "TieImplementation member realms > is still a valid implementation in its own realm :: runtime error: [string \"spec\"]:44: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:44: in function 'newAdornee'\n\t[string \"spec\"]:195: in function <[string \"spec\"]:192>"
+  ],
+  "passed": 0
+ },
+ {
+  "pkg": "tie",
+  "spec": "TieInterface.spec.lua",
+  "file": "<repo>/src/tie/src/Shared/TieInterface.spec.lua",
+  "ms": 782,
+  "failed": 16,
+  "failures": [
+   "TieInterface.IsImplemented with an implParent only > returns true for a valid implementation :: runtime error: [string \"spec\"]:32: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:32: in function 'newAdornee'\n\t[string \"spec\"]:76: in function <[string \"spec\"]:73>",
+   "TieInterface.IsImplemented with an implParent only > returns false when a required member is missing :: runtime error: [string \"spec\"]:32: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:32: in function 'newAdornee'\n\t[string \"spec\"]:87: in function <[string \"spec\"]:84>",
+   "TieInterface.IsImplemented with an implParent only > ignores the container name when no adornee is given :: runtime error: [string \"spec\"]:32: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:32: in function 'newAdornee'\n\t[string \"spec\"]:99: in function <[string \"spec\"]:96>",
+   "TieInterface.IsImplemented with an implParent and an adornee > returns true for a valid implementation on the adornee :: runtime error: [string \"spec\"]:32: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:32: in function 'newAdornee'\n\t[string \"spec\"]:112: in function <[string \"spec\"]:109>",
+   "TieInterface.IsImplemented with an implParent and an adornee > returns true for every container name valid in the realm :: runtime error: [string \"spec\"]:32: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:32: in function 'newAdornee'\n\t[string \"spec\"]:124: in function <[string \"spec\"]:120>",
+   "TieInterface.IsImplemented with an implParent and an adornee > returns false for a container name that is not valid in the realm :: runtime error: [string \"spec\"]:32: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:32: in function 'newAdornee'\n\t[string \"spec\"]:136: in function <[string \"spec\"]:133>",
+   "TieInterface.IsImplemented with an implParent and an adornee > returns false for an unrelated container name :: runtime error: [string \"spec\"]:32: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:32: in function 'newAdornee'\n\t[string \"spec\"]:147: in function <[string \"spec\"]:144>",
+   "TieInterface.IsImplemented with an implParent and an adornee > returns false when the container is parented elsewhere :: runtime error: [string \"spec\"]:32: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:32: in function 'newAdornee'\n\t[string \"spec\"]:158: in function <[string \"spec\"]:155>",
+   "TieInterface.IsImplemented with an implParent and an adornee > returns false when a valid container is missing a required member :: runtime error: [string \"spec\"]:32: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:32: in function 'newAdornee'\n\t[string \"spec\"]:170: in function <[string \"spec\"]:167>",
+   "TieInterface.IsImplemented with an implParent and an adornee > follows the container as it is renamed and reparented :: runtime error: [string \"spec\"]:32: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:32: in function 'newAdornee'\n\t[string \"spec\"]:182: in function <[string \"spec\"]:179>",
+   "TieInterface.IsImplemented with an adornee only > returns true when the adornee has an implementation :: runtime error: [string \"spec\"]:32: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:32: in function 'newAdornee'\n\t[string \"spec\"]:205: in function <[string \"spec\"]:202>",
+   "TieInterface.IsImplemented with an adornee only > returns false when the adornee has no implementation :: runtime error: [string \"spec\"]:32: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:32: in function 'newAdornee'\n\t[string \"spec\"]:216: in function <[string \"spec\"]:213>",
+   "TieInterface.IsImplemented with an adornee only > returns false when the only container is not valid in the realm :: runtime error: [string \"spec\"]:32: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:32: in function 'newAdornee'\n\t[string \"spec\"]:226: in function <[string \"spec\"]:223>",
+   "TieInterface.ObserveIsImplemented > emits for an implParent on an adornee :: runtime error: [string \"spec\"]:32: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:32: in function 'newAdornee'\n\t[string \"spec\"]:247: in function <[string \"spec\"]:244>",
+   "TieInterface.ObserveIsImplemented > emits for an implParent alone :: runtime error: [string \"spec\"]:32: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:32: in function 'newAdornee'\n\t[string \"spec\"]:264: in function <[string \"spec\"]:261>",
+   "TieInterface.ObserveIsImplemented > emits for an adornee alone :: runtime error: [string \"spec\"]:32: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:32: in function 'newAdornee'\n\t[string \"spec\"]:281: in function <[string \"spec\"]:278>"
+  ],
+  "passed": 0
+ },
+ {
+  "pkg": "tie",
+  "spec": "TieUtils.spec.lua",
+  "file": "<repo>/src/tie/src/Shared/Utils/TieUtils.spec.lua",
+  "ms": 782,
+  "failed": 0,
+  "failures": {},
+  "passed": 5
+ },
+ {
+  "pkg": "attributeutils",
+  "spec": "AttributeUtils.spec.lua",
+  "file": "<repo>/src/attributeutils/src/Shared/AttributeUtils.spec.lua",
+  "ms": 777,
+  "failed": 13,
+  "failures": [
+   "AttributeUtils.initAttribute() > writes the default when the attribute is unset :: runtime error: [string \"spec\"]:23: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:23: in function 'setup'\n\t[string \"spec\"]:55: in function <[string \"spec\"]:54>",
+   "AttributeUtils.initAttribute() > keeps a value that is already set :: runtime error: [string \"spec\"]:23: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:23: in function 'setup'\n\t[string \"spec\"]:63: in function <[string \"spec\"]:62>",
+   "AttributeUtils.initAttribute() > keeps a value of false :: runtime error: [string \"spec\"]:23: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:23: in function 'setup'\n\t[string \"spec\"]:73: in function <[string \"spec\"]:72>",
+   "AttributeUtils.getAttribute() > returns the default when the attribute is unset :: runtime error: [string \"spec\"]:23: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:23: in function 'setup'\n\t[string \"spec\"]:84: in function <[string \"spec\"]:83>",
+   "AttributeUtils.getAttribute() > returns the attribute when it is set :: runtime error: [string \"spec\"]:23: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:23: in function 'setup'\n\t[string \"spec\"]:92: in function <[string \"spec\"]:91>",
+   "AttributeUtils.getAttribute() > returns a value of false instead of the default :: runtime error: [string \"spec\"]:23: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:23: in function 'setup'\n\t[string \"spec\"]:101: in function <[string \"spec\"]:100>",
+   "AttributeUtils.removeAllAttributes() > removes every attribute :: runtime error: [string \"spec\"]:23: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:23: in function 'setup'\n\t[string \"spec\"]:112: in function <[string \"spec\"]:111>",
+   "AttributeUtils.removeAllAttributes() > leaves an instance without attributes alone :: runtime error: [string \"spec\"]:23: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:23: in function 'setup'\n\t[string \"spec\"]:124: in function <[string \"spec\"]:123>",
+   "AttributeUtils.promiseAttribute() > resolves immediately when the attribute is already set :: runtime error: [string \"spec\"]:23: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:23: in function 'setup'\n\t[string \"spec\"]:135: in function <[string \"spec\"]:134>",
+   "AttributeUtils.promiseAttribute() > resolves once the attribute is set :: runtime error: [string \"spec\"]:23: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:23: in function 'setup'\n\t[string \"spec\"]:149: in function <[string \"spec\"]:148>",
+   "AttributeUtils.promiseAttribute() > waits for a value the predicate accepts :: runtime error: [string \"spec\"]:23: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:23: in function 'setup'\n\t[string \"spec\"]:165: in function <[string \"spec\"]:164>",
+   "AttributeUtils.promiseAttribute() > rejects when the cancel token cancels :: runtime error: [string \"spec\"]:23: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:23: in function 'setup'\n\t[string \"spec\"]:186: in function <[string \"spec\"]:185>",
+   "AttributeUtils.promiseAttribute() > rejects a predicate that is not a function :: runtime error: [string \"spec\"]:23: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:23: in function 'setup'\n\t[string \"spec\"]:201: in function <[string \"spec\"]:200>"
+  ],
+  "passed": 2
+ },
+ {
+  "pkg": "attributeutils",
+  "spec": "AttributeValue.spec.lua",
+  "file": "<repo>/src/attributeutils/src/Shared/AttributeValue.spec.lua",
+  "ms": 725,
+  "failed": 18,
+  "failures": [
+   "AttributeValue.new() > writes the default value to the object :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:42: in function <[string \"spec\"]:41>",
+   "AttributeValue.new() > leaves an attribute that is already set :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:51: in function <[string \"spec\"]:50>",
+   "AttributeValue.new() > writes nothing when there is no default value :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:62: in function <[string \"spec\"]:61>",
+   "AttributeValue.new() > rejects an attribute name that is not a string :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:78: in function <[string \"spec\"]:77>",
+   "AttributeValue.Value > reads the attribute back :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:89: in function <[string \"spec\"]:88>",
+   "AttributeValue.Value > writes the attribute :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:99: in function <[string \"spec\"]:98>",
+   "AttributeValue.Value > falls back to the default once the attribute is cleared :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:110: in function <[string \"spec\"]:109>",
+   "AttributeValue.AttributeName > reports the attribute it is bound to :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:123: in function <[string \"spec\"]:122>",
+   "AttributeValue.AttributeName > cannot be assigned to :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:130: in function <[string \"spec\"]:129>",
+   "AttributeValue.Changed > fires when the attribute changes :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:143: in function <[string \"spec\"]:142>",
+   "AttributeValue members > throws when reading a member that does not exist :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:162: in function <[string \"spec\"]:161>",
+   "AttributeValue members > throws when writing a member that does not exist :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:173: in function <[string \"spec\"]:172>",
+   "AttributeValue:Observe() > fires the current value and every change :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:186: in function <[string \"spec\"]:185>",
+   "AttributeValue:Observe() > fires the default value once the attribute is cleared :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:199: in function <[string \"spec\"]:198>",
+   "AttributeValue:Observe() > fires nil when there is no default value :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:212: in function <[string \"spec\"]:211>",
+   "AttributeValue:ObserveBrio() > emits a brio for the current value :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:231: in function <[string \"spec\"]:230>",
+   "AttributeValue:ObserveBrio() > kills the last brio when the value changes :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:242: in function <[string \"spec\"]:241>",
+   "AttributeValue:ObserveBrio() > skips values the condition rejects :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:257: in function <[string \"spec\"]:256>"
+  ],
+  "passed": 1
+ },
+ {
+  "pkg": "attributeutils",
+  "spec": "EncodedAttributeValue.spec.lua",
+  "file": "<repo>/src/attributeutils/src/Shared/EncodedAttributeValue.spec.lua",
+  "ms": 791,
+  "failed": 19,
+  "failures": [
+   "EncodedAttributeValue.new() > encodes the default value onto the object :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'setup'\n\t[string \"spec\"]:50: in function <[string \"spec\"]:49>",
+   "EncodedAttributeValue.new() > leaves an attribute that is already set :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'setup'\n\t[string \"spec\"]:59: in function <[string \"spec\"]:58>",
+   "EncodedAttributeValue.new() > writes nothing when there is no default value :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'setup'\n\t[string \"spec\"]:70: in function <[string \"spec\"]:69>",
+   "EncodedAttributeValue.new() > rejects an encode that is not a function :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'setup'\n\t[string \"spec\"]:80: in function <[string \"spec\"]:79>",
+   "EncodedAttributeValue.new() > rejects a decode that is not a function :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'setup'\n\t[string \"spec\"]:89: in function <[string \"spec\"]:88>",
+   "EncodedAttributeValue.Value > decodes what is stored on the object :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'setup'\n\t[string \"spec\"]:100: in function <[string \"spec\"]:99>",
+   "EncodedAttributeValue.Value > encodes what is written to it :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'setup'\n\t[string \"spec\"]:110: in function <[string \"spec\"]:109>",
+   "EncodedAttributeValue.Value > falls back to the default once the attribute is cleared :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'setup'\n\t[string \"spec\"]:121: in function <[string \"spec\"]:120>",
+   "EncodedAttributeValue.AttributeName > reports the attribute it is bound to :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'setup'\n\t[string \"spec\"]:134: in function <[string \"spec\"]:133>",
+   "EncodedAttributeValue.AttributeName > cannot be assigned to :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'setup'\n\t[string \"spec\"]:141: in function <[string \"spec\"]:140>",
+   "EncodedAttributeValue.Changed > fires when the attribute changes :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'setup'\n\t[string \"spec\"]:154: in function <[string \"spec\"]:153>",
+   "EncodedAttributeValue members > throws when reading a member that does not exist :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'setup'\n\t[string \"spec\"]:173: in function <[string \"spec\"]:172>",
+   "EncodedAttributeValue members > throws when writing a member that does not exist :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'setup'\n\t[string \"spec\"]:184: in function <[string \"spec\"]:183>",
+   "EncodedAttributeValue:Observe() > fires the decoded value and every change :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'setup'\n\t[string \"spec\"]:197: in function <[string \"spec\"]:196>",
+   "EncodedAttributeValue:Observe() > fires the default value once the attribute is cleared :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'setup'\n\t[string \"spec\"]:210: in function <[string \"spec\"]:209>",
+   "EncodedAttributeValue:Observe() > fires nil when there is no default value :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'setup'\n\t[string \"spec\"]:223: in function <[string \"spec\"]:222>",
+   "EncodedAttributeValue:ObserveBrio() > emits a brio with the decoded value :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'setup'\n\t[string \"spec\"]:242: in function <[string \"spec\"]:241>",
+   "EncodedAttributeValue:ObserveBrio() > kills the last brio when the value changes :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'setup'\n\t[string \"spec\"]:253: in function <[string \"spec\"]:252>",
+   "EncodedAttributeValue:ObserveBrio() > skips encoded values the condition rejects :: runtime error: [string \"spec\"]:27: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:27: in function 'setup'\n\t[string \"spec\"]:268: in function <[string \"spec\"]:267>"
+  ],
+  "passed": 0
+ },
+ {
+  "pkg": "attributeutils",
+  "spec": "JSONAttributeValue.spec.lua",
+  "file": "<repo>/src/attributeutils/src/Shared/JSONAttributeValue.spec.lua",
+  "ms": 854,
+  "failed": 10,
+  "failures": [
+   "JSONAttributeValue.new() > encodes the default value onto the object :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:42: in function <[string \"spec\"]:41>",
+   "JSONAttributeValue.new() > writes nothing when there is no default value :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:51: in function <[string \"spec\"]:50>",
+   "JSONAttributeValue.Value > round trips a dictionary :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:63: in function <[string \"spec\"]:62>",
+   "JSONAttributeValue.Value > round trips a list :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:73: in function <[string \"spec\"]:72>",
+   "JSONAttributeValue.Value > decodes what another writer stored :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:83: in function <[string \"spec\"]:82>",
+   "JSONAttributeValue.Value > falls back to the default once the attribute is cleared :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:93: in function <[string \"spec\"]:92>",
+   "JSONAttributeValue.Value > clears the attribute when written a value it cannot encode :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:103: in function <[string \"spec\"]:102>",
+   "JSONAttributeValue.Value > reads nil when the attribute is not a string :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:113: in function <[string \"spec\"]:112>",
+   "JSONAttributeValue:Observe() > fires the decoded value and every change :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:125: in function <[string \"spec\"]:124>",
+   "JSONAttributeValue:Observe() > fires the default value once the attribute is cleared :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:138: in function <[string \"spec\"]:137>"
+  ],
+  "passed": 0
+ },
+ {
+  "pkg": "attributeutils",
+  "spec": "RxAttributeUtils.spec.lua",
+  "file": "<repo>/src/attributeutils/src/Shared/RxAttributeUtils.spec.lua",
+  "ms": 786,
+  "failed": 11,
+  "failures": [
+   "RxAttributeUtils.observeAttribute() > fires the current value and every change :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:47: in function <[string \"spec\"]:46>",
+   "RxAttributeUtils.observeAttribute() > fires the default value while the attribute is unset :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:60: in function <[string \"spec\"]:59>",
+   "RxAttributeUtils.observeAttributeKeys() > fires every key that is already set :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:83: in function <[string \"spec\"]:82>",
+   "RxAttributeUtils.observeAttributeKeys() > fires keys as they are added :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:95: in function <[string \"spec\"]:94>",
+   "RxAttributeUtils.observeAttributeKeysBrio() > emits a live brio for every key that is set :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:111: in function <[string \"spec\"]:110>",
+   "RxAttributeUtils.observeAttributeKeysBrio() > kills the brio once the attribute is removed :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:124: in function <[string \"spec\"]:123>",
+   "RxAttributeUtils.observeAttributeKeysBrio() > keeps the same brio while the key only changes value :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:139: in function <[string \"spec\"]:138>",
+   "RxAttributeUtils.observeAttributeBrio() > emits a brio for the current value :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:156: in function <[string \"spec\"]:155>",
+   "RxAttributeUtils.observeAttributeBrio() > replaces the brio when the value changes :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:168: in function <[string \"spec\"]:167>",
+   "RxAttributeUtils.observeAttributeBrio() > does not emit again for the same value :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:184: in function <[string \"spec\"]:183>",
+   "RxAttributeUtils.observeAttributeBrio() > skips values the condition rejects :: runtime error: [string \"spec\"]:19: attempt to index nil with 'new'\nstack traceback:\n\t[string \"spec\"]:19: in function 'setup'\n\t[string \"spec\"]:199: in function <[string \"spec\"]:198>"
+  ],
+  "passed": 1
+ },
+ {
+  "pkg": "bindable-utils",
+  "spec": "BindableEncodingUtils.spec.lua",
+  "file": "<repo>/src/bindable-utils/src/Shared/BindableEncodingUtils.spec.lua",
+  "ms": 761,
+  "failed": 0,
+  "failures": {},
+  "passed": 5
+ },
+ {
+  "pkg": "string",
+  "spec": "String.spec.lua",
+  "file": "<repo>/src/string/src/Shared/String.spec.lua",
+  "ms": 694,
+  "failed": 0,
+  "failures": {},
+  "passed": 48
+ }
+]
