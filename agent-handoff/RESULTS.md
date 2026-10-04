@@ -39,3 +39,63 @@ Two cloud-proxy obstacles, and how the script gets around them without changing 
 Gotchas found while setting up:
 - **`lune setup` edits `.luaurc` in the current directory,** adding a `"lune"` alias. Run it outside the repo (the script does), or the repo's `.luaurc` shows up as modified.
 - **The repo's Claude hooks need the tools on the default PATH.** `.claude/hooks/luau-lint-before-push.mjs` runs `npm run lint:luau` before every `git push` from Claude, and the stylua hook formats every edited file. A shell-local `export PATH` doesn't reach them, so the script symlinks the tools into `/usr/local/bin`.
+
+## M1. The test runner: `tools/lune-headless`
+
+**Done.** The probe harness is now a small, dependency-free Lune tool. See `tools/lune-headless/README.md` for how it works.
+
+| Command | What it does |
+|---|---|
+| `npm run test:lune` | The 37 specs in the immediateutils/jecs/iris package closure (same closure as `probe/closure.js`). Writes `tools/lune-headless/out/results.json` and exits 1 only if a spec in `expectations.json` `mustPass` regresses. |
+| `npm run test:lune:all` | Every spec under `src/` (312). |
+| `npm run test:lune:selftest` | Runs `selftest/Runner.spec.lua` and checks 19 outcomes of the runner's own semantics. |
+| `lune run tools/lune-headless/run.luau [--level=none\|basic\|roblox] [paths or --package=a,b] [--filter=text]` | Ad hoc runs. |
+
+What changed from the probe:
+- **Yield-then-fail is fixed.** Each test body runs in its own thread inside `xpcall`, and the runner waits for that thread to *finish* (polling Lune's scheduler), so an error after a yield fails the test. `selftest` pins this down: `[fails] a test that yields and then fails is a failure`.
+- **Per-test timeout,** 5 s by default (`--test-timeout`, or jest's third `it` argument). A test that never finishes fails with "Exceeded timeout". Each spec runs in its own process, which is killed after `--timeout` (60 s) in case a test loops without yielding.
+- **Real Jest structure:** collect then run, hooks scoped to their describe block, `beforeAll`/`afterAll`, `.skip`/`.only`/`todo`, `done` callbacks, describe-body errors reported as failures.
+- **jest-lua parity** checked against the vendored jest-lua 3.10.0-quenty.2 source, especially the fake timers (`jest-fake-timers/src/init.lua`): what gets faked, how time advances, errors rethrown from `advanceTimersByTime`. Matchers and mocks cover everything used in `src/**/*.spec.lua` (counted: 4907 `toEqual`, 2997 `toBe`, 648 `toThrow`, ...).
+- **Loader parity:** names resolve per package through the dependency graph, following `PackageTracker.ResolveDependency`. The probe used a global first-found index, which could pick the wrong copy of a duplicated name; `Maid` exists in both `src/maid` and `src/loader`.
+- **Linux fixes:**
+  - `fs.isFile`/`fs.isDir` throw "Not a directory" when a path component is a file, so on Linux every probe spec failed to load (37/37 `LOAD-FAIL`).
+  - Lune's `fs` yields, which breaks `script.Parent.X` inside metamethods. The runner now takes a file snapshot before running.
+- **Stray errors** in spawned or deferred threads are recorded per test and don't fail it, as on Roblox. Lune would otherwise set exit code 1 for the whole process.
+- Error locations read `src/pkg/src/Shared/File.lua:12:` (the chunk name gets an `@` prefix).
+
+### Spec results, closure of immediateutils + jecs + iris (37 specs)
+
+| Level | Tests passing | Specs fully green | Wall time (4 jobs) |
+|---|---|---|---|
+| Windows probe `basic` (FINDINGS §4) | 248 / 476 | 12 | n/a |
+| Windows probe `roblox` (FINDINGS §4) | 306 / 477 | 14 | n/a |
+| **Linux `none`** | 100 / 117 (26 specs fail to load) | 5 | 1.8 s |
+| **Linux `basic`** | **276 / 486** | **17** | **1.7 s** |
+| **Linux `roblox`** | **339 / 487** | **19** | 11.5 s (two `promiseChild` tests sit out the 5 s timeout) |
+
+Totals differ slightly from the probe because describe-body errors now count as failures, and the probe stopped counting a spec at its first harness crash.
+
+The specs green at `basic` are the 9 the a1 harness passed (Rx, BrioUtils, RxBrioUtils, Promise, PromiseUtils, PromiseRetryUtils, PromiseTestUtils, ThrottledFunction, MaidTaskUtils) plus ImmediateScheduler, ServiceBag, PendingPromiseTracker, promiseWait, TieUtils, NevermoreTestResults, BindableEncodingUtils and String. No source changes were needed.
+
+**Whole repo** (`--all`, 312 specs):
+
+| Level | Tests passing | Specs green | Load errors | Time |
+|---|---|---|---|---|
+| `basic` | 1508 / 2238 | 82 | 161 | 23 s |
+| `roblox` | 2260 / 4061 | 109 | 43 | 42 s |
+
+One spec is timing-flaky under parallel load: `ScoredActionPicker.spec` "breaks score ties in favor of the older action" relies on two `os.clock()` reads differing, and failed in 1 of 3 runs.
+
+Most remaining `roblox` load errors are emulation gaps for M5: RunService members (`IsRunning`, `IsStudio`), `@lune/roblox` constructors with no arguments (`Vector3`-typed defaults in `DefaultValueUtils`), and a missing `Enum.X:FromValue`.
+
+### Remaining failures at `basic` in the closure, by cause
+| Cause | Specs | Milestone |
+|---|---|---|
+| Instance trees with events (ChildAdded, AttributeChanged, GetPropertyChangedSignal, AncestryChanged) | attributeutils ×5, instanceutils, promise ×3 (InstanceUtils/child/propertyValue), tie ×4 | M5 |
+| BindableEvent/BindableFunction | steputils, tie | M5 |
+| RunService (IsClient/IsServer/IsRunning, Stepped, BindToRenderStep) | steputils ×3, TieRealmService | M5 |
+| `Instance.new`/`Vector3` only | JestUtils, RandomUtils (both pass at `roblox`) | - |
+| Roblox-only by design | ImmediateHotReloadInstall (Studio hot reload) | none |
+
+### Typing
+`luau-lsp analyze --platform=standard tools/lune-headless/run.luau tools/lune-headless/worker.luau tools/lune-headless/lib tools/lune-headless/selftest/check.luau` reports 0 errors (strict mode, `@lune` resolved through `tools/lune-headless/.luaurc`).

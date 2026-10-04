@@ -32,6 +32,9 @@
     "prelint:luau": "npm run build:sourcemap && npx @quenty/nevermore-cli tools download-roblox-types",
     "prelint:selene": "selene generate-roblox-std",
     "test": "npx @quenty/nevermore-cli batch test",
+    "test:lune": "lune run tools/lune-headless/run.luau --expect=tools/lune-headless/expectations.json",
+    "test:lune:all": "lune run tools/lune-headless/run.luau --all",
+    "test:lune:selftest": "lune run tools/lune-headless/selftest/check.luau",
     "test:ts": "pnpm -r --filter \"./tools/**\" --filter \"!./tools/nevermore-vscode\" --if-present run test",
     "release": "auto shipit",
     "preinstall": "npx only-allow pnpm"
