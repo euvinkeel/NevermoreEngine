@@ -14,6 +14,10 @@ The five questions I asked in plain English after the night, and what was decide
 3. **Hooks split by their assumptions** (pure, Roblox, facade). Kept as built: `hooks.value` stays in the Roblox pack.
 4. **`spring` and `linearWalk`** stay in the pure pack unchanged.
 5. **The GameVersionUtils spec bug.** Left alone: no changes to code outside what the work needs.
+6. **The jecs bugs.** Don't interact with the jecs repository in any way (its maintainers are tired of AI contributions); make the best of the jecs we have. *Done:*
+   - `experiments/jecs-findings/JecsWorkarounds.luau` keeps jecs off its broken paths: a safe delete, a remove-then-add retarget for exclusive relations, an explicit remove-all, and an integrity check.
+   - The Statuh fuzz uses the workarounds and checks jecs's integrity every frame. Two more bugs turned up along the way, six in all, each with a repro.
+   - The rule is in `CLAUDE.md` under "Common Pitfalls", so every session sees it. Remove it there if you'd rather keep it out of that file.
 
 ## M0
 - **Global nevermore-cli.** CI runs `npm install --ignore-scripts -g .` in `tools/nevermore-cli`. Repeating it over an existing global link fails inside npm (`Cannot read properties of null (reading 'package')`), so `cloud-setup.sh` skips it when `nevermore` is already on PATH. *Choice:* skip; nothing in the milestones needs the global CLI.
@@ -34,7 +38,7 @@ The five questions I asked in plain English after the night, and what was decide
 ## M4 (details and more in experiments/statuh-scope/DESIGN.md, "Open questions")
 - **Cycles in VisibleThrough.** The notes say cycles mean invisible, but that breaks guardrail 5. *Choice:* a cycle shares its members' grants, bounded by hops. *Resolved (answer 1):* sharing stays, and the walk stops at an entity it already visited instead of at a hop limit.
 - **Monotonicity covers authorization, not relevance.** Removing an inheritance link can widen relevance (interest). *Choice:* treat relevance as non-security. *Resolved (answer 2):* relevance left core, so scope is permission only and monotone throughout.
-- **The jecs bugs** (`experiments/jecs-findings/`, four now). *Choice:* reported here and worked around in the fuzz only. Not patched (third-party, out of scope). One of them, a delete that corrupts an entity that survives it, has a one-line fix I tested on a scratch copy; the README has the cause. Report upstream or patch the fork?
+- **The jecs bugs** (`experiments/jecs-findings/`). *Choice:* reported here and worked around in the fuzz only. Not patched (third-party, out of scope). *Resolved (answer 6):* no contact with the jecs project; the workarounds are now a tested module, and there are six bugs.
 - **The typed API is a proposal.** The prototype's runtime surface (`scope.Net`, raw pairs) is untyped; the typed helpers (`Net.join`, `Net.showTo`, ...) exist only as stubs.
 
 ## M5

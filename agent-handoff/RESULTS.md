@@ -42,7 +42,7 @@ The M5 target specs (attributeutils, instanceutils, tie, steputils, and the prom
   - Design comparison, typed API stubs (15 must-fail lines), and a prototype. Reworked after the owner's answers: scope is permission only, VisibleThrough names an entity, and components can be narrower than their entity.
   - 20 tests, and a 6,000-seed soak with 0 failures.
   - Benchmark: ~3.7 ms/frame at 50 players × 2,000 entities.
-  - Six prototype bugs and four jecs bugs found by fuzzing, one of the jecs bugs with its cause and a tested one-line fix. The jecs repros are in `experiments/jecs-findings/`.
+  - Six prototype bugs and six jecs bugs found by fuzzing. Each jecs bug has a repro and a tested workaround in `experiments/jecs-findings/`; per the owner, nothing goes to the jecs project.
 - **M5.** The `datamodel` level, built on Lune's reflection database plus the luau-lsp definitions, with unique EnumItems and frame-aligned waits. It also turned up four runner bugs that affected every level: `toBe` semantics, `tick()` resolution, yielding requires, and concurrent requires.
 - **M6.** The common hooks are split into a pure pack, a Roblox pack and a facade. The merge is flat and keeps `debug.info(3)` keying, which a spec verifies; it fails if a hook gets wrapped.
 - **M7.** Portability lint with a baseline.
@@ -277,11 +277,17 @@ The owner answered the M4 questions (`QUESTIONS.md`, "Owner's answers"). What ch
 - **Tests.** 18 scenario tests (5 new for the arena) plus the 2 fuzz tests, 20 in all. Invariant 6 now also checks HIDE vs REM. The fuzz retargets VisibleThrough links, closes them into loops, and has a component visible only through a rule. Breaking the core on purpose (REM instead of HIDE, or not re-keying entities when a viewer's keys grow) fails both the scenarios and the fuzz. Soak: 3,000 + 3,000 seeds × 60 frames, 0 failures.
 - **Types.** `Statuh.rule(name)` names a rule for a component's visibility, `Net.visibleThrough` replaces `Net.follow`, and there's a new Arena example. The check prints `types OK: 5 files type-check, 15 must-fail lines all fail`.
 - **Cost.** With the camera as a restrict rule, panning is 2.8 ms per frame and teleporting 12.6 ms. Sending positions only to nearby cameras (component visibility, every entity still delivered) costs 4.7 ms per frame, against 3.7 ms without it, and doubles the join frame (516 ms vs 268 ms).
-- **jecs.** The fuzz found a third delete bug, and this time its cause:
-  - Deleting an entity can corrupt another entity that survives the delete. That happens when the survivor holds a pair to the deleted entity and anything ever held both a `ChildOf` pair and another pair to it, which is the normal shape of attached items.
-  - `world_delete` skips clearing a shared table when it `continue`s past a ChildOf archetype. Adding `table.clear(to_remove)` before that `continue` fixes it on a scratch copy; the vendored jecs is unchanged.
-  - A jecs-only search also found a crash in cascade deletes.
-  - Each bug has a minimal repro in `experiments/jecs-findings/` (four in all), and the fuzz now detaches pairs into the deleted set before every delete.
+- **jecs.** The owner's rule: no contact with the jecs project, so we work around its bugs (`experiments/jecs-findings/README.md`). Six now, each with a minimal repro:
+  - A delete can corrupt an entity that survives it, when the survivor holds a pair to the deleted entity and anything ever held both a `ChildOf` pair and another pair to it. That's the normal shape of attached items.
+  - A cascade delete can leave a child alive, or crash, when children hold pairs to each other.
+  - Deleting an entity with no components can corrupt another entity.
+  - Retargeting an exclusive relation (reparenting with `ChildOf`, moving `VisibleThrough`) can drop an entity from every query, once the new target is deleted and its id reused.
+  - Removing `pair(R, jecs.Wildcard)` corrupts the entity.
+
+  `JecsWorkarounds.luau` avoids all six: a safe delete, a remove-then-add retarget, an explicit remove-all, and an integrity check over jecs's bookkeeping. Evidence:
+  - A random search checks jecs against a plain model after every operation. Plain jecs calls go wrong in 2,975 of 10,000 seeds; with the workarounds, in none.
+  - The Statuh fuzz now runs through the workarounds and checks jecs's integrity every frame (invariant 0). It passes all 6,000 soak seeds. With plain jecs calls, 87 of 1,000 seeds fail, all at that check.
+  - `JecsWorkarounds.spec.luau` (14 tests) also asserts that each bug is still there, so a jecs upgrade that fixes one shows up as a failure.
 
 ## M5. Fake DataModel with events: `--level=datamodel`
 
