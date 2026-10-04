@@ -4,8 +4,9 @@
 	spec gets fresh module state (like jest-lua's per-file registry) and a hung spec can be killed.
 
 	lune run tools/lune-headless/worker.luau --root=<repo> --spec=<file> --out=<result.json>
-		[--index=<index.json>] [--level=none|basic|roblox] [--test-timeout=<seconds>]
+		[--index=<index.json>] [--level=none|basic|roblox|datamodel] [--test-timeout=<seconds>]
 		[--filter=<text>] [--verbose]
+		datamodel level: [--realm=server|client] [--running] [--studio] [--signals=immediate|deferred]
 ]]
 
 local fs = require("@lune/fs")
@@ -59,6 +60,16 @@ local globals = Host.build({
 	log = function(kind: string, message: string)
 		jest:log(kind, message)
 	end,
+	onStrayError = function(message: string)
+		jest:strayError(message)
+	end,
+	datamodel = {
+		isClient = args.realm == "client",
+		isRunning = args.running == "true",
+		isStudio = args.studio == "true",
+		signalMode = if args.signals == "deferred" then "deferred" else "immediate",
+		apiPath = root .. "/globalTypes.d.lua",
+	},
 })
 local loader = ModuleLoader.new({
 	index = index,

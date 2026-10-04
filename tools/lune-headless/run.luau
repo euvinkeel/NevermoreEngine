@@ -10,7 +10,10 @@
 		<paths>                   spec files, package directories, or other directories of specs
 
 	Options:
-		--level=basic             host level: none | basic | roblox (see lib/Host.luau)
+		--level=basic             host level: none | basic | roblox | datamodel (see lib/Host.luau)
+		--realm=server            datamodel level: server | client (RunService:IsClient/IsServer)
+		--running, --studio       datamodel level: RunService:IsRunning() / IsStudio() return true
+		--signals=immediate       datamodel level: immediate | deferred signal behavior
 		--jobs=4                  specs run in parallel, one Lune process each
 		--timeout=60              seconds before a whole spec process is killed
 		--test-timeout=5          seconds a single test (or hook) may take
@@ -217,13 +220,15 @@ local function runOne(spec: string): SpecResult
 		"--index=" .. indexPath,
 		"--level=" .. level,
 	}
-	for _, key in { "test-timeout", "filter" } do
+	for _, key in { "test-timeout", "filter", "realm", "signals" } do
 		if options[key] then
 			table.insert(workerArgs, `--{key}={options[key]}`)
 		end
 	end
-	if options.detail == "true" then
-		table.insert(workerArgs, "--detail")
+	for _, flag in { "detail", "running", "studio" } do
+		if options[flag] == "true" then
+			table.insert(workerArgs, "--" .. flag)
+		end
 	end
 
 	local specStarted = os.clock()

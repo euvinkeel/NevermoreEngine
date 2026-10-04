@@ -2,7 +2,7 @@
 --[[
 	`expect`, its matchers, asymmetric matchers and `jest.fn`/`jest.spyOn` mocks: the subset of
 	jest-lua that Nevermore specs use (counted across src/**/*.spec.lua), with jest-lua's semantics:
-	- toBe uses identity, with NaN equal to itself (Object.is).
+	- toBe is Object.is: `==` (so __eq applies), NaN equal to itself, 0 not -0.
 	- toEqual compares recursively and ignores metatables; toStrictEqual also compares metatables.
 	- toThrow(text) passes when the error message contains `text` (plain find).
 	- Matchers may be called with `.` or `:`.
@@ -21,8 +21,13 @@ local function isNaN(v: any): boolean
 	return type(v) == "number" and v ~= v
 end
 
+-- jest-lua's Object.is (collections/src/Object/is.lua): `==`, so __eq applies (Roblox datatypes and
+-- EnumItems compare by value), NaN is itself, and 0 is not -0.
 local function objectIs(a: any, b: any): boolean
-	return rawequal(a, b) or (isNaN(a) and isNaN(b))
+	if a == b then
+		return a ~= 0 or 1 / a == 1 / b
+	end
+	return isNaN(a) and isNaN(b)
 end
 
 local function isAsymmetric(v: any): boolean

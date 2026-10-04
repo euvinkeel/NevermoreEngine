@@ -8,20 +8,105 @@
 	          and a `game` whose only working service is a pure HttpService.
 	- roblox: basic + @lune/roblox Instances and datatypes (Vector3, CFrame, Enum, ...). Lune's
 	          Instances have no events, so this level only helps code that reads instance trees.
+	- datamodel: basic + @lune/roblox datatypes and Enum, with Instances, `game`, `workspace` and
+	          `typeof` from FakeDataModel: instances with events, Bindables, RunService frame signals
+	          stepped about 60 times a second in real time, CollectionService. By default it looks like
+	          a Nevermore test place: server, not running, not Studio, immediate signals.
 ]]
 
+local FakeDataModel = require("./FakeDataModel")
+local RobloxApi = require("./RobloxApi")
 local RobloxPure = require("./RobloxPure")
 local Scheduler = require("./Scheduler")
+local realTask = require("@lune/task")
 
 local Host = {}
 
-export type Level = "none" | "basic" | "roblox"
+export type Level = "none" | "basic" | "roblox" | "datamodel"
+
+export type DataModelOptions = {
+	isClient: boolean?,
+	isRunning: boolean?,
+	isStudio: boolean?,
+	signalMode: FakeDataModel.SignalMode?,
+	-- luau-lsp definitions (globalTypes.d.lua) for event and method names; optional.
+	apiPath: string?,
+}
 
 export type Options = {
 	level: Level,
 	scheduler: Scheduler.Scheduler,
 	log: (kind: string, message: string) -> (),
+	onStrayError: (message: string) -> (),
+	datamodel: DataModelOptions?,
 }
+
+local DATATYPES = {
+	"Axes",
+	"BrickColor",
+	"CFrame",
+	"Color3",
+	"ColorSequence",
+	"ColorSequenceKeypoint",
+	"Enum",
+	"Faces",
+	"Font",
+	"NumberRange",
+	"NumberSequence",
+	"NumberSequenceKeypoint",
+	"PhysicalProperties",
+	"Ray",
+	"Rect",
+	"Region3",
+	"Region3int16",
+	"UDim",
+	"UDim2",
+	"Vector2",
+	"Vector2int16",
+	"Vector3",
+	"Vector3int16",
+}
+
+-- Installs @lune/roblox datatypes into `globals` and returns them.
+local function installDatatypes(globals: { [string]: any }): { [string]: any }
+	local roblox = require("@lune/roblox") :: any
+	local datatypes: { [string]: any } = {}
+	for _, name in DATATYPES do
+		datatypes[name] = roblox[name]
+	end
+	-- Lune's constructors need arguments where Roblox's have defaults (BrickColor.new() is Medium
+	-- stone grey, Ray.new() and Region3.new() are empty at the origin).
+	local zeroArgDefaults: { [string]: () -> any } = {
+		BrickColor = function()
+			return roblox.BrickColor.new("Medium stone grey")
+		end,
+		Ray = function()
+			return roblox.Ray.new(roblox.Vector3.zero, roblox.Vector3.zero)
+		end,
+		Region3 = function()
+			return roblox.Region3.new(roblox.Vector3.zero, roblox.Vector3.zero)
+		end,
+		Region3int16 = function()
+			return roblox.Region3int16.new(roblox.Vector3int16.new(), roblox.Vector3int16.new())
+		end,
+	}
+	for name, makeDefault in zeroArgDefaults do
+		local original = roblox[name]
+		datatypes[name] = setmetatable({
+			new = function(...)
+				if select("#", ...) == 0 then
+					return makeDefault()
+				end
+				return original.new(...)
+			end,
+		}, { __index = original })
+	end
+	for name, value in datatypes do
+		globals[name] = value
+	end
+	RobloxPure.Vector3 = roblox.Vector3
+	return datatypes
+end
 
 local function joinArgs(...: any): string
 	local parts = table.pack(...)
@@ -116,45 +201,7 @@ function Host.build(options: Options): { [string]: any }
 		local roblox = require("@lune/roblox") :: any
 		local dataModel = roblox.Instance.new("DataModel")
 		globals.Instance = roblox.Instance
-		for _, name in
-			{
-				"Axes",
-				"BrickColor",
-				"CFrame",
-				"Color3",
-				"ColorSequence",
-				"ColorSequenceKeypoint",
-				"Enum",
-				"Faces",
-				"Font",
-				"NumberRange",
-				"NumberSequence",
-				"NumberSequenceKeypoint",
-				"PhysicalProperties",
-				"Ray",
-				"Rect",
-				"Region3",
-				"Region3int16",
-				"UDim",
-				"UDim2",
-				"Vector2",
-				"Vector2int16",
-				"Vector3",
-				"Vector3int16",
-			}
-		do
-			globals[name] = roblox[name]
-		end
-		-- Lune's BrickColor.new() needs an argument; Roblox's defaults to Medium stone grey.
-		globals.BrickColor = setmetatable({
-			new = function(...)
-				if select("#", ...) == 0 then
-					return roblox.BrickColor.new("Medium stone grey")
-				end
-				return roblox.BrickColor.new(...)
-			end,
-		}, { __index = roblox.BrickColor })
-		RobloxPure.Vector3 = roblox.Vector3
+		installDatatypes(globals)
 		globals.workspace = dataModel:GetService("Workspace")
 		globals.game = setmetatable({
 			GetService = function(_self, name: string)
@@ -174,6 +221,40 @@ function Host.build(options: Options): { [string]: any }
 				return value
 			end,
 		})
+	elseif level == "datamodel" then
+		local dmOptions: DataModelOptions = options.datamodel or {}
+		local isClient = dmOptions.isClient == true
+		local dm = FakeDataModel.new({
+			scheduler = scheduler,
+			signalMode = dmOptions.signalMode or "immediate",
+			isClient = isClient,
+			isServer = not isClient,
+			isStudio = dmOptions.isStudio == true,
+			isRunning = dmOptions.isRunning == true,
+			datatypes = installDatatypes(globals),
+			reflection = (require("@lune/roblox") :: any).getReflectionDatabase(),
+			api = if dmOptions.apiPath then RobloxApi.load(dmOptions.apiPath) else nil,
+			onStrayError = options.onStrayError,
+		})
+		globals.Instance = dm.Instance
+		globals.game = dm.game
+		globals.workspace = dm.workspace
+		globals.typeof = dm.typeof
+
+		-- Step frames in real time, whatever the fake timers do (Roblox keeps stepping too). Real
+		-- waits and delays resume after each frame's Heartbeat. The worker exits the process when
+		-- the spec is done, which ends this loop.
+		scheduler:useFrames()
+		local lastClock = os.clock()
+		realTask.spawn(function()
+			while true do
+				realTask.wait(1 / 60)
+				local now = os.clock()
+				dm.step(now - lastClock)
+				lastClock = now
+				scheduler:resumeFrameWaiters()
+			end
+		end)
 	end
 
 	return globals
