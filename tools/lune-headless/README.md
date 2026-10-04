@@ -11,6 +11,7 @@ npm run test:lune            # the immediateutils closure, gated by expectations
 npm run test:lune:all        # every spec under src/
 npm run test:lune:datamodel  # every spec on the fake DataModel, gated by expectations.datamodel.json
 npm run test:lune:selftest   # checks the runner's own semantics
+npm run lint:portability     # Roblox-only API use in the engine-free closure (see below)
 
 lune run tools/lune-headless/run.luau src/maid src/rx            # some packages
 lune run tools/lune-headless/run.luau src/rx/src/Shared/Rx.spec.lua
@@ -97,6 +98,17 @@ By default it looks like a Nevermore test place, as described in `docs/testing/t
 ## Expectations
 
 `expectations.json` lists the specs that must pass (`mustPass`) and the ones known to fail, each with a reason (`knownFailing`). With `--expect`, the exit code is 1 only if a must-pass spec doesn't pass. A known-failing spec that starts passing is reported so it can be promoted. `expectations.datamodel.json` does the same for every spec at the datamodel level. Each of its `knownFailing` reasons starts with a class: `emulation gap`, `harness gap`, `needs the real engine`, `slow`, `spec bug`, or `out of scope`.
+
+## Portability lint (`portability.luau`)
+
+`npm run lint:portability` finds Roblox-only API use in the modules meant to run without the engine, so a new engine dependency there gets noticed. It only reports. It never edits code, and Roblox-only modules outside the closure aren't its concern.
+
+- **The pure closure** is every module reachable at require time from the roots at the top of `portability.luau`: the immediate-mode core, `JecsImmediateHooksCoreHooks`, ServiceBag, Rx/Promise/Signal/Maid, Spring and RandomUtils. Requires are followed statically (`require("Name")` through Nevermore's resolution, plus `require(script.Parent.X)`), with comments stripped.
+- **The check** runs `luau-lsp --platform=standard` with `portability/portable.d.luau`, which declares only what the `basic` host polyfills.
+- **Findings:**
+  - Runtime: an unknown global (`game`, `Vector3`, `workspace`...), marked "import" when it sits on an unindented line and so runs at require time.
+  - Type-only: a Roblox type in an annotation. Harmless at runtime.
+- **The baseline.** `--check` compares against `portability/baseline.json` and exits 1 when a file gains a finding. `--update-baseline` accepts the current state. Full details go to `out/portability.json`.
 
 ## Working on the runner
 

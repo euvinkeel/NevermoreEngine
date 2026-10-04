@@ -314,3 +314,23 @@ lune run tools/lune-headless/run.luau src/jecs/src/Shared/Immediate/hooks       
 lune run tools/lune-headless/run.luau src/jecs/src/Shared/Immediate/hooks/JecsImmediateHooksCoreHooks.spec.lua --level=none  # loads; only the timer-free test passes
 npm run lint:luau
 ```
+
+## M7 (stretch). Portability lint
+
+`npm run lint:portability` runs `tools/lune-headless/portability.luau --check`; the README section "Portability lint" has the details.
+
+- **Closure.** It follows requires statically from 20 roots on the engine-free path (the FINDINGS §2 pure and polyfill-only modules, plus `JecsImmediateHooksCoreHooks`), reaching 31 modules.
+- **Check.** It runs `luau-lsp analyze --platform=standard` with `portability/portable.d.luau`, which declares only what the `basic` host polyfills.
+- **Classification.** Unknown globals count as runtime use, marked "import" when they run at require time. Roblox types in annotations count as type-only.
+- **Baseline.** `--check` fails only when a file gains a finding. I confirmed it catches a new use: an import-time `workspace` added to Spring.lua was flagged and the check exited 1.
+- **Speed:** about 1 s.
+
+**Current findings.** These are reported, not fixed; each is a known, guarded use:
+
+| Kind | Count | Where |
+|---|---|---|
+| Runtime, import time | **0** | Nothing in the closure touches the engine while loading. |
+| Runtime, call time | 11 | CFrame ×3 and Vector3 ×2 in the `spring`/`linearWalk` datatype branches (CoreHooks); Vector3/Vector2/Color3 ×4 in JecsImmediateHookUtils' datatype branches; `Vector3.new` in `RandomUtils.randomUnitVector3`; `game` in Promise's lazy HttpService fetch (inside a pcall, M3). All sit behind `typeof` guards, in a pcall, or in a function that's Roblox-specific by name. |
+| Type-only | 33 | `Instance` (10), `RBXScriptConnection` (6), `CFrame` (4), `Color3` (3), `Vector3` (3), `HttpService` (2), `Plugin` (2), `RBXScriptSignal` (2), `Vector2` (1) |
+
+Type classification uses `globalTypes.d.lua` to tell Roblox types apart: jecs's own type functions aren't Roblox API. So `--check` refuses to run without that file, which `npm run lint:luau` downloads.

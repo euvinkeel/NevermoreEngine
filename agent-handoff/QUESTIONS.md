@@ -42,3 +42,8 @@ Each entry names the conservative choice I made so work could continue.
 - **`spring` and `linearWalk` keep their CFrame/Color3 branches in the pure pack.** FINDINGS proposed moving "the CFrame/Color3 datatype paths" to the Roblox pack. Since a hook can't wrap another, that would mean two full copies of each hook. The branches only run for CFrame/Color3 values (behind `typeof` guards) and require nothing. *Choice:* unchanged in the pure pack. Off Roblox, they just never take those branches.
 - **The pure `guid` isn't HttpService's.** It's a v4 GUID in the same braced, uppercase format, from `math.random`. On Roblox the facade always uses HttpService's.
 - **The hook table is untyped for strict consumers** (before and after the split). `hooks.gate()` is `any` there. Not changed; noting it in case Raven expected types.
+
+## M7
+- **The roots of the pure closure are a hand-written list** in `portability.luau` (FINDINGS §2 plus CoreHooks). *Choice:* explicit roots rather than inferring them. Add a root when a new module joins the engine-free path.
+- **Not wired into CI.** `lint:portability` is a root script only. `.github/workflows` is off limits (ground rule 4), and the check needs `globalTypes.d.lua`, which the existing lint job already downloads.
+- **Call-time findings are accepted into the baseline as they are** (datatype branches, Promise's guarded `game`). The import-time count is 0, and that's the number worth keeping at 0.
