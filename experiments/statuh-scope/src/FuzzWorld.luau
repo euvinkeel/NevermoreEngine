@@ -1,9 +1,11 @@
 --!nonstrict
 --[[
-	A random world for the invariant tests: rooms, players, grants, overrides, inheritance chains
-	and cycles, all three rule modes, references and owner-only data, with random edits every
+	A random world for the invariant tests: rooms, players, grants, overrides, VisibleThrough chains
+	and cycles, grant and restrict rules, references, owner-only data and a component visible only
+	through a rule ("near"), with random edits every
 	frame. ScopeHarness checks its invariants after each frame; `runSeed` also checks that narrowing
-	edits never widen visibility.
+	edits never widen visibility. ChildOf and Follows are ordinary game relations, replicated as
+	data; only VisibleThrough affects visibility.
 
 	Every failure message starts with the seed and frame, so `runSeed(seed, frames)` replays it.
 ]]
@@ -18,13 +20,15 @@ local CELLS = 12
 function FuzzWorld.runSeed(
 	seed: number,
 	frameCount: number,
-	options: { enterBudget: number?, onFrame: ((any, number) -> ())? }?
+	options: {
+		enterBudget: number?,
+		onFrame: ((any, number) -> ())?,
+		beforeStep: ((any, number) -> ())?,
+	}?
 )
 	local rng = Rng.new(seed)
 	local h = ScopeHarness.new({
 		enterBudget = options and options.enterBudget,
-		hysteresisFrames = rng:int(1, 3),
-		maxInheritDepth = 4,
 	})
 	local world, Net, jecs, scope = h.world, h.Net, h.jecs, h.scope
 
@@ -40,8 +44,9 @@ function FuzzWorld.runSeed(
 		Zoned = world:component(),
 		Focus = world:component(),
 		Vision = world:component(),
+		Pos = world:component(),
 	}
-	-- An exclusive relation without delete cascades, so inheritance cycles can form.
+	-- An ordinary game relation (no cascades), replicated as data.
 	local Follows = world:component()
 	world:add(Follows, jecs.Exclusive)
 	h:replicate(C.Name)
@@ -52,8 +57,26 @@ function FuzzWorld.runSeed(
 	h.scope.replicateRelation(jecs.ChildOf)
 	h.scope.replicateRelation(Follows)
 
+	-- A component narrower than its entity: Pos goes only to viewers whose focus is near the
+	-- entity's cell. The rule has no appliesTo; it's only a component's visibility.
+	h:addRule("near", {
+		mode = "restrict",
+		dependsOn = { C.Cell },
+		viewerDependsOn = { C.Focus },
+		key = function(entity)
+			local cell = world:get(entity, C.Cell)
+			return if cell then cell // 3 else nil
+		end,
+		viewerKeys = function(player)
+			local focus = world:get(player, C.Focus)
+			return if focus then { [focus // 3] = true } else {}
+		end,
+	})
+	h:replicate(C.Pos, { visibleTo = "near" })
+
+	-- Interest management is game code: a camera rule is an ordinary restrict rule.
 	h:addRule("camera", {
-		mode = "relevance",
+		mode = "restrict",
 		appliesTo = C.Spatial,
 		dependsOn = { C.Cell },
 		viewerDependsOn = { C.Focus },
@@ -164,16 +187,23 @@ function FuzzWorld.runSeed(
 		local list = alive()
 		if #list > 0 and rng:chance(0.3) then
 			-- ChildOf only to an older entity, so it stays acyclic (deletes cascade along it).
-			world:add(e, jecs.pair(jecs.ChildOf, rng:pick(list) :: number))
-			if rng:chance(0.7) then
-				world:add(e, jecs.pair(Net.VisibleThrough, jecs.ChildOf))
+			local parent = rng:pick(list) :: number
+			world:add(e, jecs.pair(jecs.ChildOf, parent))
+			-- Usually the parent is also what it's visible through, but that's the game's choice.
+			if rng:chance(0.6) then
+				world:add(e, jecs.pair(Net.VisibleThrough, parent))
 			end
 		elseif #list > 0 and rng:chance(0.15) then
 			world:add(e, jecs.pair(Follows, rng:pick(list) :: number))
-			world:add(e, jecs.pair(Net.VisibleThrough, Follows))
+		end
+		if #list > 0 and not world:target(e, Net.VisibleThrough, 0) and rng:chance(0.15) then
+			world:add(e, jecs.pair(Net.VisibleThrough, rng:pick(list) :: number))
 		end
 		if rng:chance(0.5) then
 			world:set(e, C.Hp, rng:int(1, 100))
+		end
+		if rng:chance(0.5) then
+			world:set(e, C.Pos, { x = rng:int(1, 99) })
 		end
 		if rng:chance(0.3) then
 			world:set(e, C.Secret, { code = rng:int(1, 999) })
@@ -192,10 +222,13 @@ function FuzzWorld.runSeed(
 		table.insert(things, e)
 	end
 
-	-- jecs 0.11.0-quenty.3 bug (see experiments/jecs-findings): a cascade delete along ChildOf skips
-	-- a child that gets moved mid-cascade, which happens when it has an ordinary relation pair to
-	-- a sibling being deleted. The skipped child keeps a dangling ChildOf that later resolves to a
-	-- recycled id. Detach those pairs first so the fuzz tests the scope core, not that bug.
+	-- jecs 0.11.0-quenty.3 bugs (see experiments/jecs-findings): deleting an entity can corrupt a
+	-- survivor that holds a relation pair to it, once anything has held a ChildOf pair and another
+	-- pair to that entity at the same time (as a weapon that's ChildOf and VisibleThrough its unit
+	-- does), and a cascading delete can skip or crash on children that hold pairs to each other. So
+	-- before every delete, detach every pair pointing into the deleted set (jecs would remove them
+	-- anyway), and the fuzz tests the scope core, not those bugs. The scenarios cover a
+	-- VisibleThrough target deleted with its pairs left for jecs to remove.
 	local function safeDelete(e: number)
 		local doomed = { e }
 		local i = 1
@@ -206,12 +239,14 @@ function FuzzWorld.runSeed(
 			i += 1
 		end
 		for _, target in doomed do
-			local followers = {}
-			for follower in world:query(jecs.pair(Follows, target)) do
-				table.insert(followers, follower)
-			end
-			for _, follower in followers do
-				world:remove(follower, jecs.pair(Follows, target))
+			for _, relation in { Follows, Net.VisibleThrough } do
+				local followers = {}
+				for follower in world:query(jecs.pair(relation, target)) do
+					table.insert(followers, follower)
+				end
+				for _, follower in followers do
+					world:remove(follower, jecs.pair(relation, target))
+				end
 			end
 		end
 		world:delete(e)
@@ -303,6 +338,16 @@ function FuzzWorld.runSeed(
 		end,
 		function()
 			local e = rng:pick(alive())
+			if e then
+				if rng:chance(0.8) then
+					world:set(e, C.Pos, { x = rng:int(1, 99) })
+				else
+					world:remove(e, C.Pos)
+				end
+			end
+		end,
+		function()
+			local e = rng:pick(alive())
 			local target = anyEntity()
 			if e and target then
 				if rng:chance(0.8) then
@@ -363,10 +408,18 @@ function FuzzWorld.runSeed(
 			end
 		end,
 		function()
+			-- Point VisibleThrough somewhere else (cycles allowed), or drop it.
 			local e = rng:pick(alive())
 			if e then
-				local relation = if rng:chance(0.5) then jecs.ChildOf else Follows
-				togglePair(e, Net.VisibleThrough, relation)
+				local current = world:target(e, Net.VisibleThrough, 0)
+				if current and rng:chance(0.3) then
+					world:remove(e, jecs.pair(Net.VisibleThrough, current))
+				else
+					local target = anyEntity()
+					if target then
+						world:add(e, jecs.pair(Net.VisibleThrough, target))
+					end
+				end
 			end
 		end,
 		function()
@@ -378,7 +431,7 @@ function FuzzWorld.runSeed(
 					world:remove(e, jecs.pair(Follows, followed))
 				end
 				if rng:chance(0.8) then
-					world:add(e, jecs.pair(Follows, target)) -- cycles allowed
+					world:add(e, jecs.pair(Follows, target))
 				end
 			end
 		end,
@@ -459,10 +512,10 @@ function FuzzWorld.runSeed(
 	}
 
 	local function checkNarrowing(frame: number)
-		local before = ScopeOracle.compute(jecs, world, scope, h.rules, 4)
+		local before = ScopeOracle.compute(jecs, world, scope, h.rules)
 		local edit = narrowing[rng:int(1, #narrowing)]
 		if edit() then
-			local after = ScopeOracle.compute(jecs, world, scope, h.rules, 4)
+			local after = ScopeOracle.compute(jecs, world, scope, h.rules)
 			local ok, detail = ScopeOracle.isSubset(after, before)
 			if not ok then
 				error(`seed {seed} frame {frame}: removing a constraint widened visibility: {detail}`, 0)
@@ -486,6 +539,9 @@ function FuzzWorld.runSeed(
 		end
 		if rng:chance(0.3) then
 			checkNarrowing(frame)
+		end
+		if options and options.beforeStep then
+			options.beforeStep(h, frame)
 		end
 		local ok, err = pcall(h.step, h)
 		if not ok then

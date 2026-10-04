@@ -9,9 +9,11 @@
 
 	World: two team rooms of 25 players; 40% of entities public, 40% team-only, 10% owned by a
 	player (owner-only component), 10% inheriting from a parent through ChildOf. Every entity has a
-	cell under a relevance rule (3x3 chunk interest around the player's camera). Each frame, 100
+	cell under a camera rule (a restrict rule: 3x3 chunks around the player's camera). Each frame, 100
 	entities change Health, 100 move to another cell, and 5 players move their camera, either by
 	one chunk (pan, realistic) or to a random cell (teleport, worst case: 18 chunk keys change).
+	The last case has no camera rule on entities; instead the Cell component itself goes only to
+	players whose camera is near (component visibility, like positions in an arena).
 ]]
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
@@ -33,7 +35,10 @@ local ENTITIES = 2000
 local GRID = 64 -- cells per side
 local CHUNK = 8
 
-local function run(label: string, options: { rules: boolean, budget: number?, smoothCamera: boolean? })
+local function run(
+	label: string,
+	options: { rules: boolean, budget: number?, smoothCamera: boolean?, nearCell: boolean? }
+)
 	local world = jecs.world()
 	local scope = StatuhScope.new(jecs, world, { enterBudget = options.budget })
 	local Net = scope.Net
@@ -42,34 +47,46 @@ local function run(label: string, options: { rules: boolean, budget: number?, sm
 	local Cell = world:component()
 	local Camera = world:component()
 	local Spatial = world:component()
-	scope.replicate(Health)
-	scope.replicate(Secret, { visibleTo = "owner" })
-	scope.replicate(Cell)
-	scope.replicateRelation(jecs.ChildOf)
 
+	local function chunkOf(e)
+		local cell = world:get(e, Cell)
+		return if cell then (cell // GRID // CHUNK) * 64 + (cell % GRID // CHUNK) else nil
+	end
+	local function chunksAroundCamera(p)
+		local cell = world:get(p, Camera) or 0
+		local cy, cx = cell // GRID // CHUNK, cell % GRID // CHUNK
+		local keys = {}
+		for dy = -1, 1 do
+			for dx = -1, 1 do
+				keys[(cy + dy) * 64 + (cx + dx)] = true
+			end
+		end
+		return keys
+	end
 	if options.rules then
 		scope.addScopeRule("camera", {
-			mode = "relevance",
+			mode = "restrict",
 			appliesTo = Spatial,
 			dependsOn = { Cell },
 			viewerDependsOn = { Camera },
-			key = function(e)
-				local cell = world:get(e, Cell)
-				return if cell then (cell // GRID // CHUNK) * 64 + (cell % GRID // CHUNK) else nil
-			end,
-			viewerKeys = function(p)
-				local cell = world:get(p, Camera) or 0
-				local cy, cx = cell // GRID // CHUNK, cell % GRID // CHUNK
-				local keys = {}
-				for dy = -1, 1 do
-					for dx = -1, 1 do
-						keys[(cy + dy) * 64 + (cx + dx)] = true
-					end
-				end
-				return keys
-			end,
+			key = chunkOf,
+			viewerKeys = chunksAroundCamera,
 		})
 	end
+	if options.nearCell then
+		scope.addScopeRule("near", {
+			mode = "restrict",
+			dependsOn = { Cell },
+			viewerDependsOn = { Camera },
+			key = chunkOf,
+			viewerKeys = chunksAroundCamera,
+		})
+	end
+
+	scope.replicate(Health)
+	scope.replicate(Secret, { visibleTo = "owner" })
+	scope.replicate(Cell, { visibleTo = if options.nearCell then "near" else "all" })
+	scope.replicateRelation(jecs.ChildOf)
 
 	local seed = 12345
 	local function rand(n: number): number
@@ -103,8 +120,9 @@ local function run(label: string, options: { rules: boolean, budget: number?, sm
 			world:add(e, jecs.pair(Net.Owner, players[1 + rand(PLAYERS)]))
 			world:set(e, Secret, { gold = rand(1000) })
 		elseif #entities > 0 then
-			world:add(e, jecs.pair(jecs.ChildOf, entities[1 + rand(#entities)]))
-			world:add(e, jecs.pair(Net.VisibleThrough, jecs.ChildOf))
+			local parent = entities[1 + rand(#entities)]
+			world:add(e, jecs.pair(jecs.ChildOf, parent))
+			world:add(e, jecs.pair(Net.VisibleThrough, parent))
 		end
 		world:add(e, Net.Replicated)
 		table.insert(entities, e)
@@ -178,6 +196,7 @@ end
 
 print(`StatuhScope bench: {PLAYERS} players, {ENTITIES} entities, 10% dirty per frame, {FRAMES} frames (codegen on)`)
 run("teams + public + owner + inherit", { rules = false })
-run("... + relevance rule, cameras pan", { rules = true, smoothCamera = true })
-run("... + relevance rule, cameras teleport", { rules = true })
+run("... + camera rule, cameras pan", { rules = true, smoothCamera = true })
+run("... + camera rule, cameras teleport", { rules = true })
 run("... + ENTER budget 64/frame (teleport)", { rules = true, budget = 64 })
+run("no camera rule; Cell near-only, pan", { rules = false, smoothCamera = true, nearCell = true })

@@ -1,6 +1,6 @@
 --[[
 	Randomized invariant tests. Each seed builds a random world (rooms, players, grants, overrides,
-	inheritance chains and cycles, all three rule modes, references, owner-only data), then applies
+	VisibleThrough chains and cycles, grant and restrict rules, references, owner-only data), then applies
 	random edits every frame. After every frame ScopeHarness checks, among others:
 
 	- no out-of-scope net id ever appears in any client's output (invariant 3, and the replica's

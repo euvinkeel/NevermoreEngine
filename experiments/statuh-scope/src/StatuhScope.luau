@@ -4,20 +4,28 @@
 	networking. Give it a jecs world and connected players; each `frame()` returns, per client, the
 	messages that client should receive, in the fixed order
 
-		ENTER, ops (SET/REM), pairs (PAIR_REM/PAIR_ADD), LEAVE, DEL, ROLLBACK
+		ENTER, ops (SET/HIDE/REM), pairs (PAIR_REM/PAIR_ADD), LEAVE, DEL, ROLLBACK
 
 	Semantics (see ../DESIGN.md, "Chosen design"):
 	- Grants say who may see an entity, and they add up: Net.Public, pair(Net.Audience, room),
-	  pair(Net.Owner, player), and pair(Net.VisibleThrough, relation), which grants the viewers of
-	  the relation's target. An entity with no grants is visible to nobody (fail closed).
+	  pair(Net.Owner, player), and pair(Net.VisibleThrough, target), which grants whoever can see
+	  the target. An entity with no grants is visible to nobody (fail closed).
+	- VisibleThrough is replication-only. Game relations (ChildOf, Held, OwnedBy, ...) mean
+	  nothing to visibility; replicateRelation only sends their pairs as data.
 	- Grant rules ("grant" mode key functions, like fog-of-war vision) add viewers too.
-	- Restrictions narrow that: the Net.VisibleTo override and "restrict"/"relevance" rules. Rules
-	  are latched when the entity starts replicating, so they can't fall off later, and a nil rule
-	  key matches nobody.
+	- Restrictions narrow that: the Net.VisibleTo override and "restrict" rules. Rules are latched
+	  when the entity starts replicating, so they can't fall off later, and a nil rule key matches
+	  nobody.
 	  So visibility only grows when a grant is added or a restriction removed. Removing a grant
 	  never widens it.
-	- Authorization (grants, override, grant and restrict rules) is revoked immediately. Relevance
-	  rules (spatial interest) let an entity linger `hysteresisFrames` before it LEAVEs.
+	- Scope is permission only, and losing it means LEAVE that frame. Interest management (what's
+	  near a camera) is game code: an ordinary rule, with any lingering the game wants built into
+	  its own keys.
+	- Components can be narrower than their entity. Each replicated component has a visibility:
+	  everyone who has the entity ("all"), its owners ("owner"), or a restrict rule named by the
+	  game (say "near"), so a far-away player can arrive as just a name and a team. When a
+	  component stops being visible to a client while it still exists, the client gets HIDE, not
+	  REM, so it can tell "hidden from you" from "removed".
 	- Nothing outside a client's delivered scope goes in its frame: entity references to hidden
 	  entities are sent as REDACTED and re-sent when the target enters, pairs are only sent while
 	  both ends are delivered, and DEL only goes to clients that had the entity.
@@ -30,7 +38,9 @@
 
 local StatuhScope = {}
 
-export type Visibility = "all" | "owner"
+-- "all" (the default): every client that has the entity. "owner": the entity's owners. Any other
+-- string names a restrict rule (addScopeRule) that decides which of those clients get it.
+export type Visibility = string
 
 export type ReplicateOptions = {
 	visibleTo: Visibility?,
@@ -50,23 +60,19 @@ export type ScopeRule = {
 	-- Components whose changes on a viewer's player entity change its keys.
 	viewerDependsOn: { number }?,
 	-- Entities that have this component when they start replicating are subject to the rule.
-	appliesTo: number,
+	-- Leave it out for a rule that's only used as a component's `visibleTo`.
+	appliesTo: number?,
 	-- "grant": viewers interested in the entity's key may see it (added to the other grants).
-	-- "restrict": only viewers interested in the key may see it (authorization; revoked at once).
-	-- "relevance": like restrict, but for interest management, so an exit lingers first.
+	-- "restrict": only viewers interested in the key may see it.
 	mode: RuleMode,
 }
 
-export type RuleMode = "grant" | "restrict" | "relevance"
+export type RuleMode = "grant" | "restrict"
 
 export type Config = {
 	-- Max entities ENTERed per client per frame. Inheritance groups are never split, so a frame
 	-- may go over this to fit its first group. nil means unlimited.
 	enterBudget: number?,
-	-- An entity that only fails relevance rules LEAVEs this many frames later. Default 3.
-	hysteresisFrames: number?,
-	-- VisibleThrough chains deeper than this, or cyclic, are invisible. Default 8.
-	maxInheritDepth: number?,
 }
 
 export type Message = { any }
@@ -131,20 +137,15 @@ type PairSet = { [number]: { [number]: boolean } } -- relation key -> target ent
 type EntityState = {
 	entity: number,
 	netId: number,
-	-- Authorized viewers (grants, override, authorization rules; inherited along VisibleThrough).
+	-- Authorized viewers (grants, override, rules; inherited along VisibleThrough), plus the pin.
 	authLo: number,
 	authHi: number,
-	-- Relevant viewers (relevance rules; every viewer when there are none; inherited too).
-	relLo: number,
-	relHi: number,
 	-- Viewers that have the entity (delivered scope).
 	delLo: number,
 	delHi: number,
-	-- Connected owners, and the owners that hold the owner-only components right now.
+	-- Connected owners.
 	ownerLo: number,
 	ownerHi: number,
-	ownerSentLo: number,
-	ownerSentHi: number,
 	-- Clients that minted this entity's net id and haven't had the spawn acknowledged.
 	pinLo: number,
 	pinHi: number,
@@ -164,14 +165,11 @@ type EntityState = {
 	ownGrantHi: number,
 	ownRestrLo: number,
 	ownRestrHi: number,
-	ownRelLo: number,
-	ownRelHi: number,
 	-- VisibleThrough parent.
 	inheritParent: number?,
-	-- Viewer index -> frames left before a relevance-only exit becomes a LEAVE.
-	linger: { [number]: number }?,
-	-- Replicated component keys present at the end of the last frame.
-	sent: { [number]: boolean },
+	-- Component key -> clients holding that component's data right now (what they were sent).
+	heldLo: { [number]: number },
+	heldHi: { [number]: number },
 	-- Replicated pairs at the end of the last frame.
 	pairs: PairSet,
 	-- Reference targets per component key, as of the last frame.
@@ -202,6 +200,8 @@ type ReplicatedComponent = {
 	key: number,
 	component: number,
 	visibleTo: Visibility,
+	-- The rule `visibleTo` names, when it isn't "all" or "owner".
+	rule: Rule?,
 	isRef: boolean,
 	refFields: { string }?,
 }
@@ -228,8 +228,6 @@ end
 function StatuhScope.new(jecs: any, world: any, config: Config?)
 	local options: Config = config or ({} :: Config)
 	local enterBudget = options.enterBudget
-	local hysteresisFrames = options.hysteresisFrames or 3
-	local maxInheritDepth = options.maxInheritDepth or 8
 
 	-- Vocabulary. Rooms, membership and audience are server-only and never replicated.
 	local Net = {
@@ -243,8 +241,8 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 		VisibleTo = world:component(),
 	}
 
-	-- One inheritance link per entity, and only through exclusive relations (one target), so
-	-- removing a pair can never promote a different parent.
+	-- One inheritance link per entity (one target), so removing a pair can never promote a
+	-- different parent.
 	world:add(Net.VisibleThrough, jecs.Exclusive)
 
 	local states: { [number]: EntityState } = {}
@@ -263,6 +261,9 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 	local pairsTo: { [number]: { [number]: { [number]: boolean } } } = {} -- target -> referrer -> keys
 
 	local replicatedByKey: { ReplicatedComponent } = {}
+	-- Replicated components whose visibility isn't "all", and the rules they name.
+	local restrictedComps: { ReplicatedComponent } = {}
+	local componentRules: { Rule } = {}
 	local relations: { number } = {} -- relation key -> relation entity
 	local watchedRelations: { [number]: boolean } = {}
 	local defaultPublic: { [number]: boolean } = {}
@@ -282,7 +283,6 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 	-- Entities destroyed or unreplicated since the last frame; references to them get redacted.
 	local gone: { [number]: boolean } = {}
 	local unreplicated: { { netId: number, delLo: number, delHi: number, entity: number } } = {}
-	local lingering: { [number]: boolean } = {}
 	local frameNumber = 0
 
 	local scope = {
@@ -537,6 +537,59 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 		end
 	end
 
+	-- Component visibility.
+
+	-- Clients that may see `info` on this entity, before "has the entity" is taken into account.
+	local function visibleBits(state: EntityState, info: ReplicatedComponent): (number, number)
+		if info.visibleTo == "all" then
+			return allLo, allHi
+		elseif info.visibleTo == "owner" then
+			return state.ownerLo, state.ownerHi
+		end
+		local rule = info.rule :: Rule
+		local key = state.ruleKeys[rule.index]
+		local bits = if key ~= nil then rule.viewersByKey[key] else nil
+		if bits then
+			return bits.lo, bits.hi
+		end
+		return 0, 0
+	end
+
+	local function isHeld(state: EntityState, key: number, v: number): boolean
+		return hasBit(state.heldLo[key] or 0, state.heldHi[key] or 0, v)
+	end
+
+	-- Keeps the held maps sparse: a key with no clients is absent.
+	local function storeBits(map: { [number]: number }, key: number, bits: number)
+		if bits ~= 0 then
+			map[key] = bits
+		else
+			map[key] = nil :: any
+		end
+	end
+
+	local function setHeld(state: EntityState, key: number, v: number, held: boolean)
+		local bl, bh = bitOf(v)
+		local lo, hi = state.heldLo[key] or 0, state.heldHi[key] or 0
+		if held then
+			lo, hi = bit32.bor(lo, bl), bit32.bor(hi, bh)
+		else
+			lo, hi = bit32.band(lo, bit32.bnot(bl)), bit32.band(hi, bit32.bnot(bh))
+		end
+		storeBits(state.heldLo, key, lo)
+		storeBits(state.heldHi, key, hi)
+	end
+
+	-- The client lost the whole entity (LEAVE, or it disconnected): it holds none of its components.
+	local function dropHeld(state: EntityState, nl: number, nh: number)
+		for key, lo in state.heldLo do
+			storeBits(state.heldLo, key, bit32.band(lo, nl))
+		end
+		for key, hi in state.heldHi do
+			storeBits(state.heldHi, key, bit32.band(hi, nh))
+		end
+	end
+
 	-- Entity lifecycle.
 
 	local function forget(entity: number): EntityState?
@@ -544,15 +597,12 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 		if not state then
 			return nil
 		end
-		for _, ruleIndex in state.rules do
-			local key = state.ruleKeys[ruleIndex]
-			if key ~= nil then
-				local set = rules[ruleIndex].entitiesByKey[key]
-				if set then
-					set[entity] = nil
-					if next(set) == nil then
-						rules[ruleIndex].entitiesByKey[key] = nil
-					end
+		for ruleIndex, key in state.ruleKeys do
+			local set = rules[ruleIndex].entitiesByKey[key]
+			if set then
+				set[entity] = nil
+				if next(set) == nil then
+					rules[ruleIndex].entitiesByKey[key] = nil
 				end
 			end
 		end
@@ -577,7 +627,6 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 		end)
 		states[entity] = nil
 		byNet[state.netId] = nil
-		lingering[entity] = nil
 		newlyReplicated[entity] = nil
 		dirtyScope[entity] = nil
 		dirtyOwn[entity] = nil
@@ -598,14 +647,10 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 			netId = netId,
 			authLo = 0,
 			authHi = 0,
-			relLo = 0,
-			relHi = 0,
 			delLo = 0,
 			delHi = 0,
 			ownerLo = 0,
 			ownerHi = 0,
-			ownerSentLo = 0,
-			ownerSentHi = 0,
 			pinLo = 0,
 			pinHi = 0,
 			rules = {},
@@ -620,11 +665,9 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 			ownGrantHi = 0,
 			ownRestrLo = 0,
 			ownRestrHi = 0,
-			ownRelLo = 0,
-			ownRelHi = 0,
 			inheritParent = nil,
-			linger = nil,
-			sent = {},
+			heldLo = {},
+			heldHi = {},
 			pairs = {},
 			refs = {},
 			rooms = {},
@@ -663,19 +706,39 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 	-- Public API.
 
 	--[=[
-		Declares a replicated component. `visibleTo = "owner"` sends it only to the entity's owners.
-		`isRef`/`refFields` mark entity references, redacted for viewers that can't see the target.
+		Declares a replicated component. `visibleTo` narrows it below the entity: "owner" sends it
+		only to the entity's owners, and the name of a restrict rule (added first) sends it only to
+		the clients that rule lets through. `isRef`/`refFields` mark entity references, redacted for
+		viewers that can't see the target.
 	]=]
 	function scope.replicate(component: number, replicateOptions: ReplicateOptions?): number
 		local opts: ReplicateOptions = replicateOptions or ({} :: ReplicateOptions)
+		local visibleTo = opts.visibleTo or "all"
+		local rule: Rule? = nil
+		if visibleTo ~= "all" and visibleTo ~= "owner" then
+			local named = ruleNames[visibleTo]
+			assert(named ~= nil, `visibleTo = "{visibleTo}" names no rule; add the rule first`)
+			assert(named.mode == "restrict", `visibleTo = "{visibleTo}" must name a restrict rule`)
+			rule = named
+			if not table.find(componentRules, named) then
+				table.insert(componentRules, named)
+				for _, state in states do
+					setEntityRuleKey(state, named)
+				end
+			end
+		end
 		local info: ReplicatedComponent = {
 			key = #replicatedByKey + 1,
 			component = component,
-			visibleTo = opts.visibleTo or "all",
+			visibleTo = visibleTo,
+			rule = rule,
 			isRef = opts.isRef == true,
 			refFields = opts.refFields,
 		}
 		table.insert(replicatedByKey, info)
+		if visibleTo ~= "all" then
+			table.insert(restrictedComps, info)
+		end
 		local function onChange(entity: number)
 			markComp(entity, info.key)
 		end
@@ -690,12 +753,10 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 			return
 		end
 		watchedRelations[relation] = true
+		-- Pairs are data only: a replicated relation has no say in visibility.
 		local function onPair(entity: number)
 			if states[entity] then
 				dirtyPairs[entity] = true
-				-- VisibleThrough(relation) follows the pair's target, which computeOwn re-reads.
-				dirtyOwn[entity] = true
-				dirtyScope[entity] = true
 			end
 		end
 		world:added(relation, onPair)
@@ -703,21 +764,15 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 	end
 
 	--[=[
-		Declares a relation whose pairs replicate (e.g. jecs.ChildOf). A pair is sent to a client
-		only while both ends are delivered to it. Also makes the relation usable with VisibleThrough.
+		Declares a relation whose pairs replicate as data (e.g. jecs.ChildOf). A pair is sent to a
+		client only while both ends are delivered to it. It never affects who sees what; use
+		pair(Net.VisibleThrough, target) for that.
 	]=]
 	function scope.replicateRelation(relation: number): number
 		local key = #relations + 1
 		relations[key] = relation
 		watchRelation(relation)
 		return key
-	end
-
-	--[=[
-		Makes a relation usable with VisibleThrough without replicating its pairs.
-	]=]
-	function scope.inheritVia(relation: number)
-		watchRelation(relation)
 	end
 
 	--[=[
@@ -854,12 +909,9 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 		end
 		for _, state in states do
 			state.delLo, state.delHi = bit32.band(state.delLo, nl), bit32.band(state.delHi, nh)
-			state.ownerSentLo, state.ownerSentHi = bit32.band(state.ownerSentLo, nl), bit32.band(state.ownerSentHi, nh)
+			dropHeld(state, nl, nh)
 			state.pinLo, state.pinHi = bit32.band(state.pinLo, nl), bit32.band(state.pinHi, nh)
 			state.pendLo, state.pendHi = bit32.band(state.pendLo, nl), bit32.band(state.pendHi, nh)
-			if state.linger then
-				state.linger[index] = nil
-			end
 		end
 		local rooms = orEmpty(roomsOfPlayer[playerEntity])
 		roomsOfPlayer[playerEntity] = nil
@@ -931,13 +983,13 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 	end
 
 	-- Scope computation, in two passes. computeOwn caches what an entity says about itself (its
-	-- grants, restrictions, relevance and owners); computeFinal folds that over its VisibleThrough
-	-- chain, at most maxInheritDepth hops up from the entity:
+	-- grants, restrictions and owners); computeFinal folds that over its VisibleThrough
+	-- chain, from the entity up, stopping at an entity it has already visited:
 	--
-	--     final(e, n) = (own(e) | final(parent, n - 1)) & restrictions(e)
+	--     final(e) = (own(e) | final(parent)) & restrictions(e)
 	--
-	-- Removing a link only drops terms from the union, so it can't widen anything. Cycles just
-	-- repeat members, so they share their grants instead of becoming invisible.
+	-- Removing a link only drops terms from the union, so it can't widen anything. A cycle shares
+	-- its members' grants instead of becoming invisible, and going round it again adds nothing.
 
 	local function computeOwn(state: EntityState)
 		local entity = state.entity
@@ -958,10 +1010,7 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 		end
 		state.ownerLo, state.ownerHi = ownerLo, ownerHi
 
-		local through = world:target(entity, Net.VisibleThrough, 0)
-		local parent = if through ~= nil and world:has(through, jecs.Exclusive)
-			then world:target(entity, through, 0)
-			else nil
+		local parent = world:target(entity, Net.VisibleThrough, 0)
 		if state.inheritParent ~= parent then
 			if state.inheritParent then
 				removeFromIndex(inheritors, state.inheritParent, entity)
@@ -993,7 +1042,7 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 		end
 		grantLo, grantHi = bit32.bor(grantLo, ownerLo), bit32.bor(grantHi, ownerHi)
 
-		-- Restrictions: the override. Restrict and relevance rules are applied in computeRules.
+		-- Restrictions: the override. Restrict rules are applied in computeRules.
 		local restrLo, restrHi = allLo, allHi
 		if world:has(entity, Net.VisibleTo) then
 			local value = world:get(entity, Net.VisibleTo)
@@ -1030,7 +1079,6 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 	local function computeRules(state: EntityState)
 		local grantLo, grantHi = state.baseGrantLo, state.baseGrantHi
 		local restrLo, restrHi = state.baseRestrLo, state.baseRestrHi
-		local relLo, relHi = allLo, allHi
 		for _, ruleIndex in state.rules do
 			local rule = rules[ruleIndex]
 			local key = state.ruleKeys[ruleIndex]
@@ -1039,45 +1087,42 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 			local hi = if bits then bits.hi else 0
 			if rule.mode == "grant" then
 				grantLo, grantHi = bit32.bor(grantLo, lo), bit32.bor(grantHi, hi)
-			elseif rule.mode == "relevance" then
-				relLo, relHi = bit32.band(relLo, lo), bit32.band(relHi, hi)
 			else
 				restrLo, restrHi = bit32.band(restrLo, lo), bit32.band(restrHi, hi)
 			end
 		end
 		state.ownGrantLo, state.ownGrantHi = grantLo, grantHi
 		state.ownRestrLo, state.ownRestrHi = restrLo, restrHi
-		state.ownRelLo, state.ownRelHi = relLo, relHi
 	end
 
 	local chainBuffer: { EntityState } = {}
+	local onChain: { [EntityState]: boolean } = {}
 
 	local function computeFinal(state: EntityState)
 		table.clear(chainBuffer)
+		table.clear(onChain)
 		chainBuffer[1] = state
+		onChain[state] = true
 		local current = state
-		for _ = 1, maxInheritDepth do
+		while true do
 			local parent = current.inheritParent
 			local parentState = if parent ~= nil then states[parent] else nil
-			if not parentState then
+			if not parentState or onChain[parentState] then
 				break
 			end
 			table.insert(chainBuffer, parentState)
+			onChain[parentState] = true
 			current = parentState
 		end
 		local authLo, authHi = 0, 0
-		local relLo, relHi = allLo, allHi
 		for i = #chainBuffer, 1, -1 do
 			local link = chainBuffer[i]
 			authLo = bit32.band(bit32.bor(link.ownGrantLo, authLo), link.ownRestrLo)
 			authHi = bit32.band(bit32.bor(link.ownGrantHi, authHi), link.ownRestrHi)
-			relLo, relHi = bit32.band(link.ownRelLo, relLo), bit32.band(link.ownRelHi, relHi)
 		end
 		-- The owner pin keeps a minting client in scope until its spawn is acknowledged.
 		authLo, authHi = bit32.bor(authLo, state.pinLo), bit32.bor(authHi, state.pinHi)
-		relLo, relHi = bit32.bor(relLo, state.pinLo), bit32.bor(relHi, state.pinHi)
 		state.authLo, state.authHi = bit32.band(authLo, allLo), bit32.band(authHi, allHi)
-		state.relLo, state.relHi = bit32.band(relLo, allLo), bit32.band(relHi, allHi)
 	end
 
 	-- Frame building.
@@ -1109,12 +1154,16 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 			local state = states[entity]
 			-- Latch the rules that apply now. They can't fall off later.
 			for _, rule in rules do
-				if world:has(entity, rule.appliesTo) then
+				if rule.appliesTo ~= nil and world:has(entity, rule.appliesTo) then
 					table.insert(state.rules, rule.index)
 				end
 			end
 			for _, ruleIndex in state.rules do
 				setEntityRuleKey(state, rules[ruleIndex])
+			end
+			-- Rules named by components' visibleTo apply to every replicated entity.
+			for _, rule in componentRules do
+				setEntityRuleKey(state, rule)
 			end
 			-- An archetype default is a grant applied once, so it's visible in the world.
 			for component in defaultPublic do
@@ -1212,6 +1261,9 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 			for _, ruleIndex in state.rules do
 				setEntityRuleKey(state, rules[ruleIndex])
 			end
+			for _, rule in componentRules do
+				setEntityRuleKey(state, rule)
+			end
 		end
 		table.clear(dirtyRuleKeys)
 
@@ -1238,16 +1290,7 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 			local bl, bh = bitOf(v)
 			local nl, nh = bit32.bnot(bl), bit32.bnot(bh)
 			state.delLo, state.delHi = bit32.band(state.delLo, nl), bit32.band(state.delHi, nh)
-			state.ownerSentLo = bit32.band(state.ownerSentLo, nl)
-			state.ownerSentHi = bit32.band(state.ownerSentHi, nh)
-			local linger = state.linger
-			if linger then
-				linger[v] = nil
-				if next(linger) == nil then
-					state.linger = nil
-					lingering[state.entity] = nil
-				end
-			end
+			dropHeld(state, nl, nh)
 			local list = leaves[v]
 			if not list then
 				list = {}
@@ -1269,8 +1312,7 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 		end
 		for entity in dirtyScope do
 			local state = states[entity]
-			local inLo = bit32.band(state.authLo, state.relLo)
-			local inHi = bit32.band(state.authHi, state.relHi)
+			local inLo, inHi = state.authLo, state.authHi
 			local enterLo = bit32.band(inLo, bit32.bnot(state.delLo))
 			local enterHi = bit32.band(inHi, bit32.bnot(state.delHi))
 			eachBit(
@@ -1289,49 +1331,13 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 				end
 			)
 			state.pendLo, state.pendHi = enterLo, enterHi
-			-- Delivered but out of scope: revoke now, or linger if only relevance failed.
+			-- Delivered but out of scope: revoke now.
 			eachBit(bit32.band(state.delLo, bit32.bnot(inLo)), bit32.band(state.delHi, bit32.bnot(inHi)), function(v)
-				if not hasBit(state.authLo, state.authHi, v) then
-					leave(state, v)
-				else
-					local linger: { [number]: number } = state.linger or {}
-					state.linger = linger
-					if linger[v] == nil then
-						-- +1 because the countdown below also runs this frame.
-						linger[v] = hysteresisFrames + 1
-						lingering[entity] = true
-					end
-				end
+				leave(state, v)
 			end)
-			local linger = state.linger
-			if linger then
-				for v in linger do
-					if hasBit(inLo, inHi, v) then
-						linger[v] = nil
-					end
-				end
-				if next(linger) == nil then
-					state.linger = nil
-					lingering[entity] = nil
-				end
-			end
 		end
 
-		-- 4. Countdowns for relevance-only exits.
-		for entity in lingering do
-			local state = states[entity]
-			local linger = state.linger :: { [number]: number }
-			for v, framesLeft in linger do
-				if framesLeft <= 1 then
-					leave(state, v)
-				else
-					linger[v] = framesLeft - 1
-				end
-			end
-		end
-
-		-- 5. Per viewer: ENTER, ops, pairs, LEAVE.
-		local enteredAny: { [number]: boolean } = {}
+		-- 4. Per viewer: ENTER, ops, pairs, LEAVE.
 
 		-- Fan out entity-major (only to viewers that have the entity) instead of scanning every
 		-- dirty entity for every viewer.
@@ -1347,19 +1353,39 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 				map[entity] = keys
 			end)
 		end
-		local ownershipFor: { [number]: { number } } = {}
-		for entity in dirtyScope do
-			local state = states[entity]
-			local changedLo = bit32.band(bit32.bxor(state.ownerLo, state.ownerSentLo), state.delLo)
-			local changedHi = bit32.band(bit32.bxor(state.ownerHi, state.ownerSentHi), state.delHi)
-			eachBit(changedLo, changedHi, function(v)
-				local list = ownershipFor[v]
-				if not list then
-					list = {}
-					ownershipFor[v] = list
+		-- Component visibility changes (ownership, a rule key, a viewer's keys) for clients that keep
+		-- the entity: compare what each should hold with what it holds. Every input to visibility
+		-- marks the entity in dirtyScope; presence changes come through dirtyComps instead.
+		local visFor: { [number]: { [number]: { [number]: boolean } } } = {}
+		if #restrictedComps > 0 then
+			for entity in dirtyScope do
+				local state = states[entity]
+				if state.delLo == 0 and state.delHi == 0 then
+					continue
 				end
-				table.insert(list, entity)
-			end)
+				for _, info in restrictedComps do
+					local wantLo, wantHi = 0, 0
+					if world:has(entity, info.component) then
+						local vl, vh = visibleBits(state, info)
+						wantLo, wantHi = bit32.band(vl, state.delLo), bit32.band(vh, state.delHi)
+					end
+					local flipLo = bit32.bxor(wantLo, state.heldLo[info.key] or 0)
+					local flipHi = bit32.bxor(wantHi, state.heldHi[info.key] or 0)
+					eachBit(flipLo, flipHi, function(v)
+						local byEntity = visFor[v]
+						if not byEntity then
+							byEntity = {}
+							visFor[v] = byEntity
+						end
+						local keys = byEntity[entity]
+						if not keys then
+							keys = {}
+							byEntity[entity] = keys
+						end
+						keys[info.key] = true
+					end)
+				end
+			end
 		end
 
 		for _, viewer in viewers do
@@ -1489,17 +1515,13 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 					state.pendHi = bit32.band(state.pendHi, bit32.bnot(bh))
 					state.delLo, state.delHi = bit32.bor(state.delLo, bl), bit32.bor(state.delHi, bh)
 					enteredNow[entity] = true
-					enteredAny[entity] = true
 					enterOrder[entity] = count + 1
-					local isOwner = hasBit(state.ownerLo, state.ownerHi, v)
-					if isOwner then
-						state.ownerSentLo, state.ownerSentHi =
-							bit32.bor(state.ownerSentLo, bl), bit32.bor(state.ownerSentHi, bh)
-					end
 					local comps = {}
 					for _, info in replicatedByKey do
-						if (info.visibleTo == "all" or isOwner) and world:has(entity, info.component) then
+						local vl, vh = visibleBits(state, info)
+						if hasBit(vl, vh, v) and world:has(entity, info.component) then
 							comps[info.key] = wireValue(info, world:get(entity, info.component), v)
+							setHeld(state, info.key, v, true)
 							if state.refs[info.key] then
 								-- A target may enter later in this frame; checked in the ops phase.
 								local keys = refsAtEnter[entity]
@@ -1594,41 +1616,32 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 					end
 				end
 			end
-			-- Ownership changed for an entity this viewer had: its owner-only components come or go.
-			for _, entity in orEmpty(ownershipFor[v]) do
-				if not leavingNow[entity] then
-					for _, info in replicatedByKey do
-						if info.visibleTo == "owner" then
-							queueResend(entity, info.key)
-						end
-					end
+			-- A component became visible or hidden for this viewer.
+			for entity, keys in orEmpty(visFor[v]) do
+				for key in keys do
+					queueResend(entity, key)
 				end
 			end
-			-- One rule for every queued key: compare what the client has with what it should have.
+			-- One rule for every queued key: compare what the client holds with what it should hold.
+			-- Losing a component that still exists is HIDE; losing one that's gone is REM.
 			for entity, keys in resend do
 				local state = states[entity]
-				local isOwner = hasBit(state.ownerLo, state.ownerHi, v)
-				local hadOwnerData = hasBit(state.ownerSentLo, state.ownerSentHi, v)
 				for key in keys do
 					local info = replicatedByKey[key]
 					local present = world:has(entity, info.component)
-					local shouldHave = present and (info.visibleTo == "all" or isOwner)
-					local clientHas = state.sent[key] == true and (info.visibleTo == "all" or hadOwnerData)
+					local shouldHave = false
+					if present then
+						local vl, vh = visibleBits(state, info)
+						shouldHave = hasBit(vl, vh, v)
+					end
 					if shouldHave then
 						emit(v, { "SET", state.netId, key, wireValue(info, world:get(entity, info.component), v) })
+						setHeld(state, key, v, true)
 						stats.ops += 1
-					elseif clientHas then
-						emit(v, { "REM", state.netId, key })
+					elseif isHeld(state, key, v) then
+						emit(v, { if present then "HIDE" else "REM", state.netId, key })
+						setHeld(state, key, v, false)
 						stats.ops += 1
-					end
-				end
-				if isOwner ~= hadOwnerData then
-					if isOwner then
-						state.ownerSentLo, state.ownerSentHi =
-							bit32.bor(state.ownerSentLo, bl), bit32.bor(state.ownerSentHi, bh)
-					else
-						state.ownerSentLo = bit32.band(state.ownerSentLo, bit32.bnot(bl))
-						state.ownerSentHi = bit32.band(state.ownerSentHi, bit32.bnot(bh))
 					end
 				end
 			end
@@ -1687,7 +1700,7 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 			end
 		end
 
-		-- 6. Entities no longer replicated (LEAVE) or destroyed (DEL), only to clients that had them.
+		-- 5. Entities no longer replicated (LEAVE) or destroyed (DEL), only to clients that had them.
 		for _, item in unreplicated do
 			-- Destroyed after it stopped replicating: that's a DEL by the time it's sent.
 			if not world:contains(item.entity) then
@@ -1712,31 +1725,13 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 		end
 		table.clear(deleted)
 
-		-- 7. ROLLBACK for predicted spawns the server didn't make.
+		-- 6. ROLLBACK for predicted spawns the server didn't make.
 		for _, viewer in viewers do
 			for _, netId in viewer.rollbacks do
 				emit(viewer.index, { "ROLLBACK", netId })
 				stats.rollbacks += 1
 			end
 			table.clear(viewer.rollbacks)
-		end
-
-		-- Remember which components are present, for next frame's REM decisions.
-		local function snapshot(entity: number)
-			local state = states[entity]
-			for _, info in replicatedByKey do
-				if world:has(entity, info.component) then
-					state.sent[info.key] = true
-				else
-					state.sent[info.key] = nil
-				end
-			end
-		end
-		for entity in dirtyComps do
-			snapshot(entity)
-		end
-		for entity in enteredAny do
-			snapshot(entity)
 		end
 
 		table.clear(dirtyScope)
@@ -1758,22 +1753,22 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 		return result
 	end
 
-	function scope.scopeBits(entity: number): (number, number, number, number)
+	function scope.scopeBits(entity: number): (number, number)
 		local state = states[entity]
 		if not state then
-			return 0, 0, 0, 0
+			return 0, 0
 		end
-		return state.authLo, state.authHi, state.relLo, state.relHi
-	end
-
-	function scope.isLingering(entity: number, v: number): boolean
-		local state = states[entity]
-		return state ~= nil and state.linger ~= nil and state.linger[v] ~= nil
+		return state.authLo, state.authHi
 	end
 
 	function scope.isPendingEnter(entity: number, v: number): boolean
 		local viewer = viewers[v]
 		return viewer ~= nil and viewer.pendingEnter[entity] == true
+	end
+
+	-- Debugging only: an entity's cached state (latched rules, rule keys, bits, parent).
+	function scope.debugState(entity: number): any
+		return states[entity]
 	end
 
 	-- Debugging only: the reverse pair index and an entity's pair baseline.

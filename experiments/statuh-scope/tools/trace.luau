@@ -3,8 +3,8 @@
 	lune run experiments/statuh-scope/tools/trace.luau <seed> <frames> <viewerIndex> <netId>...
 	(set BUDGET=<n> to replay a seed from the budgeted run)
 ]]
-local process = require("@lune/process")
 local FuzzWorld = require("../src/FuzzWorld")
+local process = require("@lune/process")
 
 local seed = tonumber(process.args[1]) or 1
 local frames = tonumber(process.args[2]) or 40

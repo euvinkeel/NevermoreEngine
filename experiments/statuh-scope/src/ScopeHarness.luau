@@ -7,10 +7,12 @@
 	1. The protocol: replicas apply every frame without error (see ClientReplica).
 	2. Engine scope equals ScopeOracle's from-scratch answer, for every entity and viewer.
 	3. No message mentions a net id the receiver isn't authorized for (except LEAVE/DEL/ROLLBACK).
-	4. Each replica equals the projection of the server world onto its delivered scope.
-	5. Delivered scope is within authorization; entities in scope are delivered (or pending, under
-	   a budget); anything delivered but out of scope is lingering, for at most `hysteresisFrames`.
-	6. LEAVE only for entities still alive; DEL only for entities that are gone.
+	4. Each replica equals the projection of the server world onto its delivered scope, with each
+	   component's own visibility ("all", "owner", or a rule) computed from scratch.
+	5. Delivered scope equals authorization: nothing unauthorized is held, and everything authorized
+	   is delivered (or pending, under a budget).
+	6. LEAVE only for entities still alive, DEL only for entities that are gone; likewise HIDE only
+	   for components that still exist, REM only for components that are gone.
 	7. Inheritance groups enter whole: if a parent enters, its in-scope inheritors enter that frame.
 ]]
 
@@ -26,31 +28,25 @@ ScopeHarness.__index = ScopeHarness
 
 export type Options = {
 	enterBudget: number?,
-	hysteresisFrames: number?,
-	maxInheritDepth: number?,
 	-- Skip the oracle comparison (for scenarios using minted entities, which the oracle can't see).
 	skipOracle: boolean?,
 }
 
 function ScopeHarness.new(options: Options?)
-	local opts = options or {}
+	local opts: Options = options or {}
 	local world = Jecs.world()
 	local self = setmetatable({}, ScopeHarness) :: any
 	self.jecs = Jecs
 	self.world = world
 	self.options = opts
-	self.hysteresisFrames = opts.hysteresisFrames or 3
 	self.scope = StatuhScope.new(Jecs, world, {
 		enterBudget = opts.enterBudget,
-		hysteresisFrames = opts.hysteresisFrames,
-		maxInheritDepth = opts.maxInheritDepth,
 	})
 	self.Net = self.scope.Net
 	self.rules = {} :: { [string]: any }
 	self.refFields = {} :: { [number]: any }
 	self.replicas = {} :: { [number]: any } -- viewer index -> ClientReplica
 	self.entityOfNet = {} :: { [number]: number } -- every net id ever seen -> entity
-	self.outOfScopeFrames = {} :: { [number]: { [number]: number } } -- viewer -> entity -> frames
 	self.frames = 0
 	self.lastMessages = {} :: { [number]: { { any } } }
 	return self
@@ -74,7 +70,6 @@ end
 function ScopeHarness.connect(self: any, player: number): number
 	local index = self.scope.addViewer(player)
 	self.replicas[index] = ClientReplica.new(self.refFields)
-	self.outOfScopeFrames[index] = {}
 	return index
 end
 
@@ -82,7 +77,6 @@ function ScopeHarness.disconnect(self: any, player: number)
 	local index = self.scope.viewerIndexOf(player)
 	self.scope.removeViewer(player)
 	self.replicas[index] = nil
-	self.outOfScopeFrames[index] = nil
 end
 
 function ScopeHarness.replicaOf(self: any, player: number): any
@@ -129,9 +123,7 @@ function ScopeHarness.step(self: any)
 		end
 	end
 
-	local oracle = if self.options.skipOracle
-		then nil
-		else ScopeOracle.compute(Jecs, world, scope, self.rules, self.options.maxInheritDepth)
+	local oracle = if self.options.skipOracle then nil else ScopeOracle.compute(Jecs, world, scope, self.rules)
 
 	-- 1 and 3: protocol, and what goes on the wire.
 	for index, replica in self.replicas do
@@ -170,6 +162,20 @@ function ScopeHarness.step(self: any)
 					checkMention(message[2], message)
 					if kind == "PAIR_ADD" or kind == "PAIR_REM" then
 						checkMention(message[4], message)
+					elseif kind == "HIDE" or kind == "REM" then
+						-- 6: HIDE vs REM.
+						local entity = self.entityOfNet[message[2]]
+						local info = scope.replicatedComponents()[message[3]]
+						local present = entity ~= nil and world:contains(entity) and world:has(entity, info.component)
+						if kind == "HIDE" and not present then
+							fail(
+								self,
+								"6 (HIDE vs REM)",
+								`HIDE for net id {message[2]} key {message[3]}, which is gone`
+							)
+						elseif kind == "REM" and present then
+							fail(self, "6 (HIDE vs REM)", `REM for net id {message[2]} key {message[3]}, which exists`)
+						end
 					elseif kind == "ENTER" then
 						for key, value in message[3] do
 							local spec = self.refFields[key]
@@ -199,15 +205,11 @@ function ScopeHarness.step(self: any)
 	-- 2: engine scope equals the oracle.
 	if oracle then
 		for entity in world:query(Net.Replicated) do
-			local authLo, authHi, relLo, relHi = scope.scopeBits(entity)
+			local authLo, authHi = scope.scopeBits(entity)
 			for index in self.replicas do
 				local engineAuth = StatuhScope.hasBit(authLo, authHi, index)
-				local engineRel = StatuhScope.hasBit(relLo, relHi, index)
 				if engineAuth ~= (oracle[index].auth[entity] == true) then
 					fail(self, "2 (engine vs oracle)", `entity {entity} viewer {index}: auth engine={engineAuth}`)
-				end
-				if engineRel ~= (oracle[index].rel[entity] == true) then
-					fail(self, "2 (engine vs oracle)", `entity {entity} viewer {index}: rel engine={engineRel}`)
 				end
 			end
 		end
@@ -217,23 +219,14 @@ function ScopeHarness.step(self: any)
 	for index, replica in self.replicas do
 		local delivered = scope.deliveredTo(index)
 		local projection = {}
+		local viewerEntity = scope.viewerList()[index].entity
 		for entity in delivered do
 			local comps = {}
-			local isOwner = false
-			local i = 0
-			local viewerEntity = scope.viewerList()[index].entity
-			while true do
-				local owner = world:target(entity, Net.Owner, i)
-				if owner == nil then
-					break
-				end
-				if owner == viewerEntity then
-					isOwner = true
-				end
-				i += 1
-			end
 			for _, info in scope.replicatedComponents() do
-				if world:has(entity, info.component) and (info.visibleTo == "all" or isOwner) then
+				if
+					world:has(entity, info.component)
+					and ScopeOracle.componentVisible(world, scope, self.rules, info, entity, viewerEntity)
+				then
 					local value = world:get(entity, info.component)
 					local function wire(ref: any): any
 						if ref == nil then
@@ -299,8 +292,7 @@ function ScopeHarness.step(self: any)
 		end
 
 		if oracle then
-			local auth, rel = oracle[index].auth, oracle[index].rel
-			local outOfScope = self.outOfScopeFrames[index]
+			local auth = oracle[index].auth
 			for entity in delivered do
 				if not auth[entity] then
 					fail(
@@ -309,33 +301,9 @@ function ScopeHarness.step(self: any)
 						`viewer {index} holds unauthorized entity {entity}`
 					)
 				end
-				if not rel[entity] then
-					outOfScope[entity] = (outOfScope[entity] or 0) + 1
-					if outOfScope[entity] > self.hysteresisFrames then
-						fail(
-							self,
-							"5 (hysteresis bound)",
-							`viewer {index} kept irrelevant entity {entity} for {outOfScope[entity]} frames`
-						)
-					end
-					if not scope.isLingering(entity, index) then
-						fail(
-							self,
-							"5 (lingering)",
-							`viewer {index} holds out-of-scope entity {entity} without lingering`
-						)
-					end
-				else
-					outOfScope[entity] = nil
-				end
-			end
-			for entity in outOfScope do
-				if not delivered[entity] then
-					outOfScope[entity] = nil
-				end
 			end
 			for entity in auth do
-				if rel[entity] and not delivered[entity] then
+				if not delivered[entity] then
 					if self.options.enterBudget == nil or not scope.isPendingEnter(entity, index) then
 						fail(self, "5 (in scope means delivered)", `viewer {index} is missing in-scope entity {entity}`)
 					end
@@ -351,14 +319,8 @@ function ScopeHarness.step(self: any)
 			end
 			for parent in enteredNow do
 				for child in world:query(Net.Replicated) do
-					local through = world:target(child, Net.VisibleThrough, 0)
-					if through ~= nil and world:target(child, through, 0) == parent then
-						if
-							auth[child]
-							and rel[child]
-							and not deliveredBefore[index][child]
-							and not enteredNow[child]
-						then
+					if world:target(child, Net.VisibleThrough, 0) == parent then
+						if auth[child] and not deliveredBefore[index][child] and not enteredNow[child] then
 							fail(
 								self,
 								"7 (groups enter whole)",
@@ -378,6 +340,19 @@ function ScopeHarness.sees(self: any, player: number, entity: number): boolean
 	local netId = self.scope.netIdOf(entity)
 	local replica = self:replicaOf(player)
 	return netId ~= nil and replica.entities[netId] ~= nil
+end
+
+-- The kind ("HIDE" or "REM") of the last time `player` lost component `key` of `entity`.
+function ScopeHarness.lastComponentRemoval(self: any, player: number, entity: number, key: number): string?
+	local netId = self.scope.netIdOf(entity)
+	local replica = self:replicaOf(player)
+	for i = #replica.componentRemovals, 1, -1 do
+		local removal = replica.componentRemovals[i]
+		if removal.netId == netId and removal.key == key then
+			return removal.kind
+		end
+	end
+	return nil
 end
 
 function ScopeHarness.lastRemoval(self: any, player: number, netId: number): string?

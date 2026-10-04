@@ -16,12 +16,13 @@ type Runtime = Statuh.Runtime
 local C = {
 	Name = Statuh.replicated(S.string(32)),
 	Health = Statuh.replicated(S.integer(0, 100000)),
+	-- Owner-only, so hideable: to anyone else, absent rolls are unknown, not "no rolls".
 	Rolls = Statuh.replicated(
 		S.struct({ attack = S.integer(0, 999), crit = S.number(), affixes = S.array(S.string(24), 4) }),
 		{ visibleTo = "owner" }
 	),
-	-- Hideable: a spectator's predicted code must treat "absent" as unknown, not "no loot".
-	LootOf = Statuh.replicated(S.entity(), { hideable = true }),
+	-- The monster that dropped it. Clients that can't see that monster get Redacted.
+	LootOf = Statuh.replicated(S.entity()),
 }
 
 export type Instance = {

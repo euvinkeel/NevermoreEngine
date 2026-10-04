@@ -5,9 +5,11 @@
 	server says this client should see.
 
 	Protocol checks:
-	- Messages come in phase order: ENTER, SET/REM, PAIR_REM/PAIR_ADD, LEAVE, DEL, ROLLBACK.
+	- Messages come in phase order: ENTER, SET/HIDE/REM, PAIR_REM/PAIR_ADD, LEAVE, DEL, ROLLBACK.
 	- Every net id a message mentions (subject, pair target, reference value) is one this client has
 	  at that point, except the subject of ENTER and ROLLBACK. REDACTED stands in for hidden ones.
+	- HIDE and REM only remove a component the client holds. Both are recorded by kind, so tests
+	  can tell "hidden from this client" (HIDE) from "removed" (REM).
 	- LEAVE and DEL remove an entity the client has, and strip pairs pointing at it without any
 	  cleanup cascade. Removals are recorded by kind so tests can tell LEAVE from DEL.
 ]]
@@ -19,6 +21,7 @@ local REDACTED = StatuhScope.REDACTED
 local PHASE = {
 	ENTER = 1,
 	SET = 2,
+	HIDE = 2,
 	REM = 2,
 	PAIR_REM = 3,
 	PAIR_ADD = 3,
@@ -44,6 +47,7 @@ export type ClientReplica = typeof(setmetatable(
 	{} :: {
 		entities: { [number]: ReplicaEntity },
 		removals: { { kind: string, netId: number, frame: number } },
+		componentRemovals: { { kind: string, netId: number, key: number, frame: number } },
 		frame: number,
 		refFields: { [number]: { string } | boolean },
 	},
@@ -55,6 +59,7 @@ function ClientReplica.new(refFields: { [number]: { string } | boolean }): Clien
 	return setmetatable({
 		entities = {},
 		removals = {},
+		componentRemovals = {},
 		frame = 0,
 		refFields = refFields,
 	}, ClientReplica)
@@ -137,8 +142,16 @@ function ClientReplica.apply(self: ClientReplica, messages: { { any } }?)
 			if kind == "SET" then
 				entity.comps[message[3]] = message[4]
 				self:_checkRefs(message[3], message[4], message)
-			elseif kind == "REM" then
-				entity.comps[message[3]] = nil
+			elseif kind == "REM" or kind == "HIDE" then
+				local key = message[3]
+				if entity.comps[key] == nil then
+					error(`{kind} for a component the client doesn't hold: {describe(message)}`, 0)
+				end
+				entity.comps[key] = nil
+				table.insert(
+					self.componentRemovals,
+					{ kind = kind :: string, netId = netId :: number, key = key :: number, frame = self.frame }
+				)
 			elseif kind == "PAIR_ADD" or kind == "PAIR_REM" then
 				local target = message[4]
 				if not self.entities[target] then

@@ -2,7 +2,8 @@
 --[[
 	RTS with fog of war. Your team always sees its own units. Enemies see a unit only while it's in
 	a cell their team has vision of; fog is a grant rule, so leaving vision revokes at once.
-	Weapons follow their unit, and neutral resources are only relevant near your camera.
+	Weapons are visible through their unit, and neutral resources are only sent near your camera:
+	interest management is game code, an ordinary restrict rule.
 ]]
 local Statuh = require("../Statuh")
 
@@ -52,7 +53,7 @@ local function setup(rt: Runtime)
 	})
 
 	rt.net.addScopeRule("camera", {
-		mode = "relevance",
+		mode = "restrict",
 		appliesTo = C.Resource,
 		dependsOn = { C.Cell },
 		viewerDependsOn = { C.Camera },
@@ -86,12 +87,13 @@ local function spawnUnit(rt: Runtime, team: Room, x: number, y: number)
 	Net.showTo(world, unit, team) -- your own team always sees it
 	world:add(unit, Net.Replicated)
 
+	-- Seen exactly when its unit is. If the game also makes it ChildOf the unit, that's just data.
 	local weapon = world:entity()
 	world:set(weapon, C.Weapon, { kind = "spear", damage = 12 })
-	world:add(weapon, Statuh.Net.Replicated)
-	world:set(weapon, Net.VisibleTo, "server") -- hidden until attached
-	Net.follow(world, weapon, Net.ChildOf)
-	Net.override(world, weapon, nil)
+	world:set(weapon, Net.VisibleTo, "server") -- hidden while it's forged
+	Net.visibleThrough(world, weapon, unit)
+	world:add(weapon, Net.Replicated)
+	Net.override(world, weapon, nil) -- forged: a deliberate reveal
 	return unit, weapon
 end
 

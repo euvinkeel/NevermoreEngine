@@ -2,8 +2,8 @@
 	Replays one fuzz seed outside the test runner and prints the error, if any.
 	lune run experiments/statuh-scope/tools/replay.luau <seed> [frames] [enterBudget]
 ]]
-local process = require("@lune/process")
 local FuzzWorld = require("../src/FuzzWorld")
+local process = require("@lune/process")
 
 local seed = tonumber(process.args[1]) or 1
 local frames = tonumber(process.args[2]) or 40
