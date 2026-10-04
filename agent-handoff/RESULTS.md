@@ -158,3 +158,45 @@ At `basic` these already passed in M1, because the host's `game` provides a pure
   Rx.spec and PendingPromiseTracker.spec go green with no host at all.
 
 Reproduce: `lune run tools/lune-headless/run.luau src/rx src/brio src/promise src/throttle src/maid` (`--level=none` for the before/after; check out `a96fa1e~1 -- src/promise/src/Shared/Promise.lua` for "before").
+
+## M4. Selective replication for Statuh: design and code-UX prototype
+
+**Done.** Everything is in `experiments/statuh-scope/`; nothing Statuh-related is in `src/`. **Read `experiments/statuh-scope/DESIGN.md` first**: the designs, scoring, choice, semantics, typing, tests, costs and open questions are all there. In short:
+
+- **Designs.** Three were written out for all three games (tower defense with teams and private inventories, RTS with fog of war, instanced dungeons with parties and spectators) and scored against all 17 guardrails:
+  - A: grants and rules stored in the world as relations;
+  - B: visibility predicates;
+  - C: pub/sub interest channels.
+
+  **A was chosen.** Grants only add and restrictions only narrow, so fail-closed and "removing never widens" hold by construction, and the fuzz tests check both on every frame. Key functions survive as rules in three modes: `grant` for fog vision, `restrict` for authorization, `relevance` for interest with hysteresis.
+- **Departures from the reference notes,** each forced by a fuzz counterexample or by a game:
+  - VisibleThrough is a union grant bounded by hops from the entity. "Deep or cyclic means invisible" isn't monotone.
+  - VisibleThrough is enforced exclusive.
+  - Rules have modes, because fog of war is a union.
+  - Archetype defaults are spawn-time grants, not fallbacks.
+
+  All are listed with reasons in DESIGN.md.
+- **Typing.** `types/Statuh.luau` stubs, three example games that type-check, and 13 must-fail lines that each error under `--flag:LuauSolverV2=false`. Run `lune run experiments/statuh-scope/types/check.luau`, which prints `types OK: 4 files type-check, 13 must-fail lines all fail`. One limit of the old solver: rule key agreement is only checked when `key`/`viewerKeys` aren't annotated.
+- **Prototype.** `src/StatuhScope.luau` is pure Luau with no networking: a jecs world, scope rules and players in; per-client ENTER, ops, pairs, LEAVE, DEL, ROLLBACK frames out in the fixed order. It covers redaction with fix-ups, fail-closed defaults, immediate revocation, relevance hysteresis, budgeted atomic group ENTERs, and an owner pin with ROLLBACK for predicted spawns. It type-checks clean (strict, old solver).
+- **Tests** (M1 runner): 12 scenario tests and 2 randomized invariant tests (250 seeds × 40 frames). Every frame of every run checks seven invariants: protocol, oracle agreement, no out-of-scope ids, replica = projection, scope bounds and hysteresis, LEAVE vs DEL, atomic groups. The randomized tests also check monotonicity. Failures print the seed. `tools/soak.luau` ran **3,000 seeds × 60 frames unbudgeted plus 3,000 × 60 with an ENTER budget, with 0 failures** (see the soak note below for the final-code rerun).
+- **Bugs the fuzz found:**
+  - Six in the prototype, all fixed.
+  - Two in the vendored jecs 0.11.0-quenty.3, each with a minimal repro in `experiments/jecs-findings/`: a cascade delete can skip a child (dangling `ChildOf` that later resolves to a recycled id), and wildcard pair removal corrupts the entity. No Nevermore source uses wildcard removal.
+- **Cost** (`bench/bench.luau`, codegen on, Lune on this Linux container), at 50 players × 2,000 entities with 10% dirty per frame:
+
+  | Scenario | Avg per frame | p95 |
+  |---|---|---|
+  | Teams, public, owner, inheritance | 3.7 ms | 5.8 ms |
+  | + chunk relevance rule, cameras panning | 3.5 ms | 6.0 ms |
+  | + chunk relevance rule, cameras teleporting (worst case) | 14.1 ms | 19.9 ms |
+
+  The first frame with every player joining at once is 130–325 ms, so joins need an ENTER budget.
+- **Legacy comparison.** DESIGN.md compares this with fanon v1 (`legacy-reference/`): diffstep compaction vs reading ops from the world at frame time, the inverse log vs ROLLBACK/pin, catch-up/warp vs budgeted ENTERs, and the trust gaps v1 had. `legacy-reference/` isn't committed (it's in `.git/info/exclude` locally).
+
+Reproduce:
+```bash
+lune run tools/lune-headless/run.luau experiments/statuh-scope
+lune run experiments/statuh-scope/tools/soak.luau 1 3000 60 && lune run experiments/statuh-scope/tools/soak.luau 5001 8000 60 3
+lune run experiments/statuh-scope/types/check.luau
+lune run experiments/statuh-scope/bench/bench.luau
+```

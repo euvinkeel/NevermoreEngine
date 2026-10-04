@@ -27,6 +27,11 @@ local PHASE = {
 	ROLLBACK = 6,
 }
 
+-- Iterates a table that may be nil (the old solver can't iterate `t or {}`).
+local function orEmpty<K, V>(t: { [K]: V }?): { [K]: V }
+	return (t or {}) :: any
+end
+
 local ClientReplica = {}
 ClientReplica.__index = ClientReplica
 
@@ -98,7 +103,7 @@ end
 function ClientReplica.apply(self: ClientReplica, messages: { { any } }?)
 	self.frame += 1
 	local phase = 0
-	for _, message in messages or {} do
+	for _, message in orEmpty(messages) do
 		local kind = message[1]
 		local netId = message[2]
 		local messagePhase = PHASE[kind]
@@ -124,7 +129,7 @@ function ClientReplica.apply(self: ClientReplica, messages: { { any } }?)
 				self:_checkRefs(key, value, message)
 			end
 		elseif kind == "ROLLBACK" then
-			table.insert(self.removals, { kind = kind, netId = netId, frame = self.frame })
+			table.insert(self.removals, { kind = kind :: string, netId = netId :: number, frame = self.frame })
 		else
 			if not entity then
 				error(`{kind} for net id {netId} the client doesn't have`, 0)
@@ -145,11 +150,9 @@ function ClientReplica.apply(self: ClientReplica, messages: { { any } }?)
 					if set and set[target] then
 						error(`duplicate PAIR_ADD: {describe(message)}`, 0)
 					end
-					if not set then
-						set = {}
-						entity.pairs[key] = set
-					end
-					set[target] = true
+					local pairsOfKey: { [number]: boolean } = set or {}
+					entity.pairs[key] = pairsOfKey
+					pairsOfKey[target] = true
 				else
 					if not (set and set[target]) then
 						error(`PAIR_REM for a pair the client doesn't have: {describe(message)}`, 0)

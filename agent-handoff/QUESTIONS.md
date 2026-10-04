@@ -17,3 +17,9 @@ Each entry names the conservative choice I made so work could continue.
 
 ## M3
 - **canceltoken and cancellabledelay have no specs.** *Choice:* I didn't add any, since they would be new source that's unverified on Roblox. Both are small and sit under the netcode path (cancellation, timers), so they're good candidates for specs later.
+
+## M4 (details and more in experiments/statuh-scope/DESIGN.md, "Open questions")
+- **Cycles in VisibleThrough.** The notes say cycles mean invisible, but that breaks guardrail 5. *Choice:* a cycle shares its members' grants, bounded by hops. Needs your call.
+- **Monotonicity covers authorization, not relevance.** Removing an inheritance link can widen relevance (interest). *Choice:* treat relevance as non-security. Alternative: don't inherit relevance, so children may linger apart from parents.
+- **The two jecs bugs** (`experiments/jecs-findings/`). *Choice:* reported here and worked around in the fuzz only. Not patched (third-party, out of scope).
+- **The typed API is a proposal.** The prototype's runtime surface (`scope.Net`, raw pairs) is untyped; the typed helpers (`Net.join`, `Net.showTo`, ...) exist only as stubs.

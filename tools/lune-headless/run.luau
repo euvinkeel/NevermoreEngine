@@ -327,7 +327,10 @@ for _, result in results do
 		end
 		strayCount += #(test.strayErrors or {})
 	end
-	local packageId = PackageIndex.packageOfPath(index, result.spec) or "?"
+	-- Specs outside src/ (e.g. experiments/<name>/...) are labelled by their folder.
+	local packageId = PackageIndex.packageOfPath(index, result.spec)
+		or string.match(relative(result.spec), "^[^/]+/([^/]+)")
+		or "?"
 	table.insert(summarySpecs, {
 		package = string.gsub(packageId, "^src/", ""),
 		spec = relative(result.spec),

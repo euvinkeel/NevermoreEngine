@@ -8,8 +8,6 @@
 	at that point).
 ]]
 
-local StatuhScope = require("./StatuhScope")
-
 local ScopeOracle = {}
 
 export type ViewerScope = {

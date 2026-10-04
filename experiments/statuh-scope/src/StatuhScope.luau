@@ -82,6 +82,11 @@ export type FrameStats = {
 	deferredEnters: number,
 }
 
+-- Iterates a table that may be nil (the old solver can't iterate `t or {}`).
+local function orEmpty<K, V>(t: { [K]: V }?): { [K]: V }
+	return (t or {}) :: any
+end
+
 local MAX_VIEWERS = 64
 
 -- Sets of viewer indices 0..63 are two 32-bit words (lo, hi).
@@ -146,7 +151,15 @@ type EntityState = {
 	-- Rule indices latched when replication started, and each rule's current key.
 	rules: { number },
 	ruleKeys: { [number]: any },
-	-- What the entity says about itself (see computeOwn), before inheritance.
+	-- Viewers with this entity in their pendingEnter.
+	pendLo: number,
+	pendHi: number,
+	-- World-derived grants and restrictions (computeOwn), before rules.
+	baseGrantLo: number,
+	baseGrantHi: number,
+	baseRestrLo: number,
+	baseRestrHi: number,
+	-- What the entity says about itself including rules (computeRules), before inheritance.
 	ownGrantLo: number,
 	ownGrantHi: number,
 	ownRestrLo: number,
@@ -213,7 +226,7 @@ local function removeFromIndex(index: { [number]: { [number]: boolean } }, key: 
 end
 
 function StatuhScope.new(jecs: any, world: any, config: Config?)
-	local options = config or {}
+	local options: Config = config or ({} :: Config)
 	local enterBudget = options.enterBudget
 	local hysteresisFrames = options.hysteresisFrames or 3
 	local maxInheritDepth = options.maxInheritDepth or 8
@@ -256,6 +269,9 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 	local rules: { Rule } = {}
 	local ruleNames: { [string]: Rule } = {}
 
+	-- dirtyOwn: the entity's own scope data in the world changed (re-read it).
+	-- dirtyScope: its final scope must be recomputed (own data, rules, parent, or viewers changed).
+	local dirtyOwn: { [number]: boolean } = {}
 	local dirtyScope: { [number]: boolean } = {}
 	local dirtyComps: { [number]: { [number]: boolean } } = {}
 	local dirtyPairs: { [number]: boolean } = {}
@@ -276,6 +292,7 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 
 	local function markScope(entity: number)
 		if states[entity] then
+			dirtyOwn[entity] = true
 			dirtyScope[entity] = true
 		end
 	end
@@ -302,8 +319,12 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 				lo, hi = bit32.bor(lo, bl), bit32.bor(hi, bh)
 			end
 		end
-		roomMembers[room] = if lo == 0 and hi == 0 then nil else { lo = lo, hi = hi }
-		for entity in entitiesOfRoom[room] or {} do
+		if lo == 0 and hi == 0 then
+			roomMembers[room] = nil
+		else
+			roomMembers[room] = { lo = lo, hi = hi }
+		end
+		for entity in orEmpty(entitiesOfRoom[room]) do
 			markScope(entity)
 		end
 	end
@@ -333,7 +354,7 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 
 	local function setRefs(state: EntityState, key: number, targets: { number }?)
 		local entity = state.entity
-		for _, target in state.refs[key] or {} do
+		for _, target in orEmpty(state.refs[key]) do
 			local referrers = refsTo[target]
 			local keys = referrers and referrers[entity]
 			if keys then
@@ -346,8 +367,12 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 				end
 			end
 		end
-		state.refs[key] = if targets and #targets > 0 then targets else nil
-		for _, target in targets or {} do
+		if targets and #targets > 0 then
+			state.refs[key] = targets
+		else
+			state.refs[key] = nil
+		end
+		for _, target in orEmpty(targets) do
 			local referrers = refsTo[target]
 			if not referrers then
 				referrers = {}
@@ -473,8 +498,8 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 	end
 
 	local function setViewerKeys(rule: Rule, viewerIndex: number, keys: { [any]: boolean }?)
-		local old = rule.keysOfViewer[viewerIndex] or {}
-		local new = keys or {}
+		local old = orEmpty(rule.keysOfViewer[viewerIndex])
+		local new = orEmpty(keys)
 		local bl, bh = bitOf(viewerIndex)
 		for key in old do
 			if not new[key] then
@@ -486,7 +511,7 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 						rule.viewersByKey[key] = nil
 					end
 				end
-				for entity in rule.entitiesByKey[key] or {} do
+				for entity in orEmpty(rule.entitiesByKey[key]) do
 					dirtyScope[entity] = true
 				end
 			end
@@ -500,12 +525,16 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 				end
 				bits.lo = bit32.bor(bits.lo, bl)
 				bits.hi = bit32.bor(bits.hi, bh)
-				for entity in rule.entitiesByKey[key] or {} do
+				for entity in orEmpty(rule.entitiesByKey[key]) do
 					dirtyScope[entity] = true
 				end
 			end
 		end
-		rule.keysOfViewer[viewerIndex] = if keys then table.clone(keys) else nil
+		if keys then
+			rule.keysOfViewer[viewerIndex] = table.clone(keys)
+		else
+			rule.keysOfViewer[viewerIndex] = nil
+		end
 	end
 
 	-- Entity lifecycle.
@@ -537,17 +566,21 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 		if state.inheritParent then
 			removeFromIndex(inheritors, state.inheritParent, entity)
 		end
-		for child in inheritors[entity] or {} do
+		for child in orEmpty(inheritors[entity]) do
 			markScope(child)
 		end
-		for _, viewer in viewers do
-			viewer.pendingEnter[entity] = nil
-		end
+		eachBit(state.pendLo, state.pendHi, function(v)
+			local viewer = viewers[v]
+			if viewer then
+				viewer.pendingEnter[entity] = nil
+			end
+		end)
 		states[entity] = nil
 		byNet[state.netId] = nil
 		lingering[entity] = nil
 		newlyReplicated[entity] = nil
 		dirtyScope[entity] = nil
+		dirtyOwn[entity] = nil
 		dirtyComps[entity] = nil
 		dirtyPairs[entity] = nil
 		dirtyRuleKeys[entity] = nil
@@ -577,6 +610,12 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 			pinHi = 0,
 			rules = {},
 			ruleKeys = {},
+			pendLo = 0,
+			pendHi = 0,
+			baseGrantLo = 0,
+			baseGrantHi = 0,
+			baseRestrLo = 0,
+			baseRestrHi = 0,
 			ownGrantLo = 0,
 			ownGrantHi = 0,
 			ownRestrLo = 0,
@@ -592,6 +631,7 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 		}
 		byNet[netId] = entity
 		newlyReplicated[entity] = true
+		dirtyOwn[entity] = true
 		dirtyScope[entity] = true
 	end)
 	world:removed(Net.Replicated, function(entity, _id, isDelete)
@@ -627,7 +667,7 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 		`isRef`/`refFields` mark entity references, redacted for viewers that can't see the target.
 	]=]
 	function scope.replicate(component: number, replicateOptions: ReplicateOptions?): number
-		local opts = replicateOptions or {}
+		local opts: ReplicateOptions = replicateOptions or ({} :: ReplicateOptions)
 		local info: ReplicatedComponent = {
 			key = #replicatedByKey + 1,
 			component = component,
@@ -653,7 +693,8 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 		local function onPair(entity: number)
 			if states[entity] then
 				dirtyPairs[entity] = true
-				-- VisibleThrough(relation) follows the pair's target.
+				-- VisibleThrough(relation) follows the pair's target, which computeOwn re-reads.
+				dirtyOwn[entity] = true
 				dirtyScope[entity] = true
 			end
 		end
@@ -722,7 +763,7 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 				dirtyViewers[viewerIndex] = true
 			end
 		end
-		for _, component in definition.viewerDependsOn or {} do
+		for _, component in orEmpty(definition.viewerDependsOn) do
 			world:added(component, onViewerChange)
 			world:changed(component, onViewerChange)
 			world:removed(component, onViewerChange)
@@ -744,6 +785,7 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 
 	local function markEverything()
 		for entity in states do
+			dirtyOwn[entity] = true
 			dirtyScope[entity] = true
 		end
 	end
@@ -769,7 +811,7 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 		local bl, bh = bitOf(index)
 		allLo, allHi = bit32.bor(allLo, bl), bit32.bor(allHi, bh)
 		-- Memberships are read from the world, which is final outside hooks.
-		local rooms = {}
+		local rooms: { [number]: boolean } = {}
 		local i = 0
 		while true do
 			local room = world:target(playerEntity, Net.Member, i)
@@ -814,11 +856,12 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 			state.delLo, state.delHi = bit32.band(state.delLo, nl), bit32.band(state.delHi, nh)
 			state.ownerSentLo, state.ownerSentHi = bit32.band(state.ownerSentLo, nl), bit32.band(state.ownerSentHi, nh)
 			state.pinLo, state.pinHi = bit32.band(state.pinLo, nl), bit32.band(state.pinHi, nh)
+			state.pendLo, state.pendHi = bit32.band(state.pendLo, nl), bit32.band(state.pendHi, nh)
 			if state.linger then
 				state.linger[index] = nil
 			end
 		end
-		local rooms = roomsOfPlayer[playerEntity] or {}
+		local rooms = orEmpty(roomsOfPlayer[playerEntity])
 		roomsOfPlayer[playerEntity] = nil
 		for room in rooms do
 			refreshRoomBits(room)
@@ -875,7 +918,7 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 		viewer.minted[actionSeq] = nil
 		local bl, bh = bitOf(viewer.index)
 		local nl, nh = bit32.bnot(bl), bit32.bnot(bh)
-		for _, netId in list or {} do
+		for _, netId in orEmpty(list) do
 			local entity = byNet[netId]
 			local state = if entity then states[entity] else nil
 			if state then
@@ -929,7 +972,7 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 			state.inheritParent = parent
 		end
 
-		-- Grants: Public, Audience rooms, owners, and grant rules (below).
+		-- Grants: Public, Audience rooms and owners. Rules are added in computeRules.
 		local grantLo, grantHi = 0, 0
 		local rooms: { [number]: boolean } = {}
 		i = 0
@@ -950,9 +993,8 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 		end
 		grantLo, grantHi = bit32.bor(grantLo, ownerLo), bit32.bor(grantHi, ownerHi)
 
-		-- Restrictions: the override and restrict rules. Relevance: relevance rules.
+		-- Restrictions: the override. Restrict and relevance rules are applied in computeRules.
 		local restrLo, restrHi = allLo, allHi
-		local relLo, relHi = allLo, allHi
 		if world:has(entity, Net.VisibleTo) then
 			local value = world:get(entity, Net.VisibleTo)
 			if value == "owner" then
@@ -967,6 +1009,28 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 				restrLo, restrHi = 0, 0
 			end
 		end
+		-- Keep the room index current (Audience rooms and a VisibleTo room).
+		for room in state.rooms do
+			if not rooms[room] then
+				removeFromIndex(entitiesOfRoom, room, entity)
+			end
+		end
+		for room in rooms do
+			if not state.rooms[room] then
+				addToIndex(entitiesOfRoom, room, entity)
+			end
+		end
+		state.rooms = rooms
+
+		state.baseGrantLo, state.baseGrantHi = grantLo, grantHi
+		state.baseRestrLo, state.baseRestrHi = restrLo, restrHi
+	end
+
+	-- Cheap: combines the cached world-derived values with the current rule bits.
+	local function computeRules(state: EntityState)
+		local grantLo, grantHi = state.baseGrantLo, state.baseGrantHi
+		local restrLo, restrHi = state.baseRestrLo, state.baseRestrHi
+		local relLo, relHi = allLo, allHi
 		for _, ruleIndex in state.rules do
 			local rule = rules[ruleIndex]
 			local key = state.ruleKeys[ruleIndex]
@@ -981,20 +1045,6 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 				restrLo, restrHi = bit32.band(restrLo, lo), bit32.band(restrHi, hi)
 			end
 		end
-
-		-- Keep the room index current (Audience rooms and a VisibleTo room).
-		for room in state.rooms do
-			if not rooms[room] then
-				removeFromIndex(entitiesOfRoom, room, entity)
-			end
-		end
-		for room in rooms do
-			if not state.rooms[room] then
-				addToIndex(entitiesOfRoom, room, entity)
-			end
-		end
-		state.rooms = rooms
-
 		state.ownGrantLo, state.ownGrantHi = grantLo, grantHi
 		state.ownRestrLo, state.ownRestrHi = restrLo, restrHi
 		state.ownRelLo, state.ownRelHi = relLo, relHi
@@ -1084,7 +1134,7 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 			membershipDirty = false
 			local changedRooms: { [number]: boolean } = {}
 			for _, viewer in viewers do
-				local rooms = {}
+				local rooms: { [number]: boolean } = {}
 				local i = 0
 				while true do
 					local room = world:target(viewer.entity, Net.Member, i)
@@ -1094,7 +1144,7 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 					rooms[room] = true
 					i += 1
 				end
-				local old = roomsOfPlayer[viewer.entity] or {}
+				local old = orEmpty(roomsOfPlayer[viewer.entity])
 				for room in rooms do
 					if not old[room] then
 						changedRooms[room] = true
@@ -1174,7 +1224,7 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 		while head <= #queue do
 			local entity = queue[head]
 			head += 1
-			for child in inheritors[entity] or {} do
+			for child in orEmpty(inheritors[entity]) do
 				if not dirtyScope[child] then
 					dirtyScope[child] = true
 					table.insert(queue, child)
@@ -1206,9 +1256,13 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 			table.insert(list, state)
 		end
 
+		for entity in dirtyOwn do
+			computeOwn(states[entity])
+		end
+		table.clear(dirtyOwn)
 		for entity in dirtyScope do
 			stats.dirtyEntities += 1
-			computeOwn(states[entity])
+			computeRules(states[entity])
 		end
 		for entity in dirtyScope do
 			computeFinal(states[entity])
@@ -1217,24 +1271,31 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 			local state = states[entity]
 			local inLo = bit32.band(state.authLo, state.relLo)
 			local inHi = bit32.band(state.authHi, state.relHi)
-			eachBit(bit32.band(inLo, bit32.bnot(state.delLo)), bit32.band(inHi, bit32.bnot(state.delHi)), function(v)
-				viewers[v].pendingEnter[entity] = true
-			end)
-			for _, viewer in viewers do
-				if viewer.pendingEnter[entity] and not hasBit(inLo, inHi, viewer.index) then
-					viewer.pendingEnter[entity] = nil
+			local enterLo = bit32.band(inLo, bit32.bnot(state.delLo))
+			local enterHi = bit32.band(inHi, bit32.bnot(state.delHi))
+			eachBit(
+				bit32.band(enterLo, bit32.bnot(state.pendLo)),
+				bit32.band(enterHi, bit32.bnot(state.pendHi)),
+				function(v)
+					viewers[v].pendingEnter[entity] = true
 				end
-			end
+			)
+			-- Out of computed scope again before it got entered: drop the pending enter.
+			eachBit(
+				bit32.band(state.pendLo, bit32.bnot(enterLo)),
+				bit32.band(state.pendHi, bit32.bnot(enterHi)),
+				function(v)
+					viewers[v].pendingEnter[entity] = nil
+				end
+			)
+			state.pendLo, state.pendHi = enterLo, enterHi
 			-- Delivered but out of scope: revoke now, or linger if only relevance failed.
 			eachBit(bit32.band(state.delLo, bit32.bnot(inLo)), bit32.band(state.delHi, bit32.bnot(inHi)), function(v)
 				if not hasBit(state.authLo, state.authHi, v) then
 					leave(state, v)
 				else
-					local linger = state.linger
-					if not linger then
-						linger = {}
-						state.linger = linger
-					end
+					local linger: { [number]: number } = state.linger or {}
+					state.linger = linger
 					if linger[v] == nil then
 						-- +1 because the countdown below also runs this frame.
 						linger[v] = hysteresisFrames + 1
@@ -1272,6 +1333,35 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 		-- 5. Per viewer: ENTER, ops, pairs, LEAVE.
 		local enteredAny: { [number]: boolean } = {}
 
+		-- Fan out entity-major (only to viewers that have the entity) instead of scanning every
+		-- dirty entity for every viewer.
+		local compsFor: { [number]: { [number]: { [number]: boolean } } } = {}
+		for entity, keys in dirtyComps do
+			local state = states[entity]
+			eachBit(state.delLo, state.delHi, function(v)
+				local map = compsFor[v]
+				if not map then
+					map = {}
+					compsFor[v] = map
+				end
+				map[entity] = keys
+			end)
+		end
+		local ownershipFor: { [number]: { number } } = {}
+		for entity in dirtyScope do
+			local state = states[entity]
+			local changedLo = bit32.band(bit32.bxor(state.ownerLo, state.ownerSentLo), state.delLo)
+			local changedHi = bit32.band(bit32.bxor(state.ownerHi, state.ownerSentHi), state.delHi)
+			eachBit(changedLo, changedHi, function(v)
+				local list = ownershipFor[v]
+				if not list then
+					list = {}
+					ownershipFor[v] = list
+				end
+				table.insert(list, entity)
+			end)
+		end
+
 		for _, viewer in viewers do
 			local v = viewer.index
 			local bl, bh = bitOf(v)
@@ -1280,7 +1370,7 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 			-- Entered entities with reference components, to fix up refs to targets entering after them.
 			local refsAtEnter: { [number]: { [number]: boolean } } = {}
 			local enterOrder: { [number]: number } = {}
-			for _, state in leaves[v] or {} do
+			for _, state in orEmpty(leaves[v]) do
 				leavingNow[state.entity] = true
 			end
 
@@ -1321,9 +1411,8 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 			end
 			for entity in candidates do
 				local root = findRoot(entity)
-				local group = groupOfRoot[root]
-				if not group then
-					group = {}
+				local group: { EntityState } = groupOfRoot[root] or {}
+				if not groupOfRoot[root] then
 					groupOfRoot[root] = group
 					table.insert(groups, group)
 				end
@@ -1396,6 +1485,8 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 				for _, state in group do
 					local entity = state.entity
 					candidates[entity] = nil
+					state.pendLo = bit32.band(state.pendLo, bit32.bnot(bl))
+					state.pendHi = bit32.band(state.pendHi, bit32.bnot(bh))
 					state.delLo, state.delHi = bit32.bor(state.delLo, bl), bit32.bor(state.delHi, bh)
 					enteredNow[entity] = true
 					enteredAny[entity] = true
@@ -1427,7 +1518,14 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 			end
 
 			-- Ops for entities this viewer already had.
+			-- Starts as the shared dirty-key sets; copied before anything is added to one.
 			local resend: { [number]: { [number]: boolean } } = {}
+			local ownedSet: { [number]: boolean } = {}
+			for entity, keys in orEmpty(compsFor[v]) do
+				if not enteredNow[entity] then
+					resend[entity] = keys
+				end
+			end
 			local function queueResend(entity: number, key: number)
 				local state = states[entity]
 				if enteredNow[entity] or not hasBit(state.delLo, state.delHi, v) then
@@ -1437,32 +1535,35 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 				if not set then
 					set = {}
 					resend[entity] = set
+					ownedSet[entity] = true
+				elseif not ownedSet[entity] then
+					if set[key] then
+						return
+					end
+					set = table.clone(set)
+					resend[entity] = set
+					ownedSet[entity] = true
 				end
 				set[key] = true
-			end
-			for entity, keys in dirtyComps do
-				for key in keys do
-					queueResend(entity, key)
-				end
 			end
 			-- References to entities that just entered can go out unredacted now, and references
 			-- to entities leaving now must be redacted before the LEAVE.
 			for target in enteredNow do
-				for referrer, keys in refsTo[target] or {} do
+				for referrer, keys in orEmpty(refsTo[target]) do
 					for key in keys do
 						queueResend(referrer, key)
 					end
 				end
 			end
 			for target in gone do
-				for referrer, keys in refsTo[target] or {} do
+				for referrer, keys in orEmpty(refsTo[target]) do
 					for key in keys do
 						queueResend(referrer, key)
 					end
 				end
 			end
 			for target in leavingNow do
-				for referrer, keys in refsTo[target] or {} do
+				for referrer, keys in orEmpty(refsTo[target]) do
 					if not leavingNow[referrer] then
 						for key in keys do
 							queueResend(referrer, key)
@@ -1474,7 +1575,7 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 			for entity, keys in refsAtEnter do
 				local state = states[entity]
 				for key in keys do
-					for _, target in state.refs[key] or {} do
+					for _, target in orEmpty(state.refs[key]) do
 						local targetState = states[target]
 						if
 							enteredNow[target]
@@ -1494,14 +1595,11 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 				end
 			end
 			-- Ownership changed for an entity this viewer had: its owner-only components come or go.
-			for entity in dirtyScope do
-				local state = states[entity]
-				if not enteredNow[entity] and not leavingNow[entity] and hasBit(state.delLo, state.delHi, v) then
-					if hasBit(state.ownerLo, state.ownerHi, v) ~= hasBit(state.ownerSentLo, state.ownerSentHi, v) then
-						for _, info in replicatedByKey do
-							if info.visibleTo == "owner" then
-								queueResend(entity, info.key)
-							end
+			for _, entity in orEmpty(ownershipFor[v]) do
+				if not leavingNow[entity] then
+					for _, info in replicatedByKey do
+						if info.visibleTo == "owner" then
+							queueResend(entity, info.key)
 						end
 					end
 				end
@@ -1553,7 +1651,7 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 						end
 					end
 				end
-				for referrer, keys in pairsTo[entity] or {} do
+				for referrer, keys in orEmpty(pairsTo[entity]) do
 					if has(referrer) and not enteredNow[referrer] then
 						for key in keys do
 							emit(v, { "PAIR_ADD", states[referrer].netId, key, state.netId })
@@ -1583,7 +1681,7 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 			end
 
 			-- LEAVE. The client forgets the entity and strips pairs to it, without cleanup traits.
-			for _, state in leaves[v] or {} do
+			for _, state in orEmpty(leaves[v]) do
 				emit(v, { "LEAVE", state.netId })
 				stats.leaves += 1
 			end
@@ -1627,7 +1725,11 @@ function StatuhScope.new(jecs: any, world: any, config: Config?)
 		local function snapshot(entity: number)
 			local state = states[entity]
 			for _, info in replicatedByKey do
-				state.sent[info.key] = if world:has(entity, info.component) then true else nil
+				if world:has(entity, info.component) then
+					state.sent[info.key] = true
+				else
+					state.sent[info.key] = nil
+				end
 			end
 		end
 		for entity in dirtyComps do
