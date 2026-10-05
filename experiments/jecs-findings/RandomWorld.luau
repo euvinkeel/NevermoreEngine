@@ -8,7 +8,7 @@
 
 	`run(seed, steps, useWorkarounds)` returns nil, or the first problem followed by the
 	operations that led to it. With `useWorkarounds`, deletes, retargets and remove-alls go
-	through JecsWorkarounds; without, through plain jecs calls. search.luau runs both.
+	through JecsWorkarounds; without, through plain jecs calls. check.luau runs both.
 ]]
 local JecsWorkarounds = require("./JecsWorkarounds")
 local Rng = require("../statuh-scope/src/Rng")

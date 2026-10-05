@@ -1,25 +1,21 @@
 --!strict
 --[[
-	Workarounds for the jecs 0.11.0-quenty.3 bugs in this folder, for code that has to live with
-	that version. Each one keeps jecs off a code path that's broken:
+	Workarounds for the jecs 0.11.0-quenty.3 bugs listed in JecsBugs, for code that has to live with
+	that version. Each keeps jecs off a broken code path:
 
-	- `delete` removes every ordinary pair pointing into what a delete will take with it, then
-	  deletes. jecs's own cleanup then never has to move a surviving entity, which is where it goes
-	  wrong (delete_corrupts_survivor, cascade_delete_skips_moved_child, cascade_delete_crashes).
-	  An entity with no components gets a tag first, so it isn't deleted through the root
-	  archetype's entity list (delete_bare_entity_corrupts_another).
-	- `setTarget` moves an exclusive relation (ChildOf, or any relation with jecs.Exclusive) by
-	  removing the old pair before adding the new one, so jecs never replaces a target in place
-	  (exclusive_retarget_loses_entity).
-	- `removeAll` removes a relation's pairs one target at a time, never with jecs.Wildcard
-	  (wildcard_remove_corrupts_entity).
-	- `checkIntegrity` reads jecs's bookkeeping and reports the damage these bugs leave, so tests
-	  can catch a case the workarounds miss. Comparing two readers of the same world can't: both
-	  read the same damage.
+	- `delete` removes every ordinary pair pointing into what a delete takes with it, then deletes,
+	  so jecs's own cleanup never has to move an entity (the first three bugs). An entity with no
+	  components gets a tag first, so it isn't deleted through the root archetype (the fourth).
+	- `setTarget` retargets an exclusive relation (ChildOf, or any with jecs.Exclusive) by removing
+	  the old pair before adding the new one, so jecs never replaces a target in place (the fifth).
+	- `removeAll` removes a relation's pairs one target at a time, never with jecs.Wildcard (the
+	  sixth).
+	- `checkIntegrity` reports the damage these bugs leave in jecs's bookkeeping, so tests can catch
+	  what the workarounds miss. Comparing two readers of the same world can't: both read the damage.
 
-	Limits: `delete` handles pairs. It doesn't handle an entity that's used as a component or as
-	a relation, and it treats a relation as cascading when it has pair(OnDeleteTarget, Delete),
-	like ChildOf.
+	Limits: `delete` handles pairs. It doesn't handle an entity that's used as a component or as a
+	relation, and it treats a relation as cascading when it has pair(OnDeleteTarget, Delete), like
+	ChildOf.
 ]]
 
 -- Untyped, like the Statuh core: jecs's phantom entity types would make every id a cast here.
