@@ -1,11 +1,10 @@
 --!nonstrict
 --[[
-	A random world for the invariant tests: rooms, players, grants, overrides, VisibleThrough chains
-	and cycles, grant and restrict rules, references, owner-only data and a component visible only
-	through a rule ("near"), with random edits every
-	frame. ScopeHarness checks its invariants after each frame; `runSeed` also checks that narrowing
-	edits never widen visibility. ChildOf and Follows are ordinary game relations, replicated as
-	data; only VisibleThrough affects visibility.
+	A random world for the invariant tests: rooms, players, grants, needs, VisibleThrough chains and
+	loops, grant and restrict rules, references, owner-only data, and a component visible only
+	through a rule ("near"), with random edits every frame. ScopeHarness checks its invariants after
+	each frame; `runSeed` also checks that narrowing edits never widen visibility. ChildOf and
+	Follows are game relations, replicated as data; only VisibleThrough affects visibility.
 
 	Every failure message starts with the seed and frame, so `runSeed(seed, frames)` replays it.
 ]]
@@ -24,119 +23,75 @@ function FuzzWorld.runSeed(
 	options: {
 		enterBudget: number?,
 		onFrame: ((any, number) -> ())?,
-		beforeStep: ((any, number) -> ())?,
 		-- false: plain jecs calls instead of JecsWorkarounds. ScopeHarness's jecs integrity check
 		-- then shows which jecs bugs the fuzz runs into.
 		jecsWorkarounds: boolean?,
 	}?
 )
 	local rng = Rng.new(seed)
-	local h = ScopeHarness.new({
-		enterBudget = options and options.enterBudget,
-	})
+	local h = ScopeHarness.new({ enterBudget = options and options.enterBudget })
 	local world, Net, jecs, scope = h.world, h.Net, h.jecs, h.scope
 	local useWorkarounds = not (options and options.jecsWorkarounds == false)
 
-	local C = {
-		Name = world:component(),
-		Hp = world:component(),
-		Secret = world:component(),
-		Target = world:component(),
-		Holder = world:component(),
-		Cell = world:component(),
-		Spatial = world:component(),
-		Fogged = world:component(),
-		Zoned = world:component(),
-		Focus = world:component(),
-		Vision = world:component(),
-		Pos = world:component(),
-	}
-	-- An ordinary game relation (no cascades), replicated as data.
-	local Follows = world:component()
+	local C = {}
+	for _, name in { "Name", "Hp", "Secret", "Target", "Holder", "Cell", "Pos", "Focus", "Vision" } do
+		C[name] = world:component()
+	end
+	-- Rule tags, spawn-time only (the core latches rules).
+	local Spatial, Fogged, Zoned = world:component(), world:component(), world:component()
+	local Follows = world:component() -- a game relation, replicated as data
 	world:add(Follows, jecs.Exclusive)
-	h:replicate(C.Name)
-	h:replicate(C.Hp)
-	h:replicate(C.Secret, { visibleTo = "owner" })
-	h:replicate(C.Target, { isRef = true })
-	h:replicate(C.Holder, { refFields = { "who" } })
-	h.scope.replicateRelation(jecs.ChildOf)
-	h.scope.replicateRelation(Follows)
 
-	-- A component narrower than its entity: Pos goes only to viewers whose focus is near the
-	-- entity's cell. The rule has no appliesTo; it's only a component's visibility.
-	h:addRule("near", {
-		mode = "restrict",
-		dependsOn = { C.Cell },
-		viewerDependsOn = { C.Focus },
-		key = function(entity)
-			local cell = world:get(entity, C.Cell)
-			return if cell then cell // 3 else nil
-		end,
-		viewerKeys = function(player)
-			local focus = world:get(player, C.Focus)
-			return if focus then { [focus // 3] = true } else {}
-		end,
-	})
-	h:replicate(C.Pos, { visibleTo = "near" })
-
-	-- Interest management is game code: a camera rule is an ordinary restrict rule.
-	h:addRule("camera", {
-		mode = "restrict",
-		appliesTo = C.Spatial,
-		dependsOn = { C.Cell },
-		viewerDependsOn = { C.Focus },
-		key = function(entity)
-			return world:get(entity, C.Cell)
-		end,
-		viewerKeys = function(player)
-			local focus = world:get(player, C.Focus)
-			if focus == nil then
-				return {}
+	-- Four rules over cells: "near" only decides a component, the others apply to tagged entities.
+	local function cellRule(name, mode, appliesTo, size, viewerKeys)
+		scope.addScopeRule(name, {
+			mode = mode,
+			appliesTo = appliesTo,
+			dependsOn = { C.Cell },
+			viewerDependsOn = { C.Focus, C.Vision },
+			key = function(entity)
+				local cell = world:get(entity, C.Cell)
+				return if cell then cell // size else nil
+			end,
+			viewerKeys = viewerKeys,
+		})
+	end
+	local function nearFocus(size, reach)
+		return function(player)
+			local focus, keys = world:get(player, C.Focus), {}
+			if focus then
+				for d = -reach, reach do
+					keys[(focus + d) // size] = true
+				end
 			end
-			return { [focus - 1] = true, [focus] = true, [focus + 1] = true }
-		end,
-	})
-	h:addRule("fog", {
-		mode = "grant",
-		appliesTo = C.Fogged,
-		dependsOn = { C.Cell },
-		viewerDependsOn = { C.Vision },
-		key = function(entity)
-			return world:get(entity, C.Cell)
-		end,
-		viewerKeys = function(player)
-			return world:get(player, C.Vision) or {}
-		end,
-	})
-	h:addRule("zone", {
-		mode = "restrict",
-		appliesTo = C.Zoned,
-		dependsOn = { C.Cell },
-		viewerDependsOn = { C.Focus },
-		key = function(entity)
-			local cell = world:get(entity, C.Cell)
-			return if cell then cell // 4 else nil
-		end,
-		viewerKeys = function(player)
-			local focus = world:get(player, C.Focus)
-			return if focus then { [focus // 4] = true } else {}
-		end,
-	})
+			return keys
+		end
+	end
+	cellRule("near", "restrict", nil, 3, nearFocus(3, 0))
+	cellRule("camera", "restrict", Spatial, 1, nearFocus(1, 1)) -- interest management is just a rule
+	cellRule("fog", "grant", Fogged, 1, function(player)
+		return world:get(player, C.Vision) or {}
+	end)
+	cellRule("zone", "restrict", Zoned, 4, nearFocus(4, 0))
+
+	scope.replicate(C.Name)
+	scope.replicate(C.Hp)
+	scope.replicate(C.Secret, { visibleTo = "owner" })
+	scope.replicate(C.Target, { refs = true })
+	scope.replicate(C.Holder, { refs = { "who" } })
+	scope.replicate(C.Pos, { visibleTo = "near" })
+	scope.replicateRelation(jecs.ChildOf)
+	scope.replicateRelation(Follows)
 
 	local rooms = {}
 	for _ = 1, 3 do
-		local room = world:entity()
-		world:add(room, Net.Room)
-		table.insert(rooms, room)
+		table.insert(rooms, h:spawn(nil, { Net.Room }, false))
 	end
-	local players = {}
-	local connected = {}
+	local players, connected = {}, {}
 	for i = 1, 6 do
-		local p = world:entity()
-		world:set(p, C.Name, "player" .. i)
-		world:set(p, C.Focus, rng:int(0, CELLS - 1))
+		local p = h:spawn({ [C.Name] = "player" .. i, [C.Focus] = rng:int(0, CELLS - 1) }, nil, false)
 		if rng:chance(0.5) then
-			world:add(p, jecs.pair(Net.Member, rooms[rng:int(1, #rooms)]))
+			world:add(p, jecs.pair(Net.Member, rng:pick(rooms)))
 		end
 		if rng:chance(0.5) then
 			world:add(p, Net.Public)
@@ -145,8 +100,8 @@ function FuzzWorld.runSeed(
 		table.insert(players, p)
 	end
 
-	local things: { number } = {}
-	local function alive(): { number }
+	local things = {}
+	local function alive()
 		local list = {}
 		for _, entity in things do
 			if world:contains(entity) then
@@ -156,70 +111,84 @@ function FuzzWorld.runSeed(
 		things = list
 		return list
 	end
-	local function anyEntity(): number?
-		local list = alive()
-		if rng:chance(0.2) then
-			return rng:pick(players)
-		end
-		return rng:pick(list)
+	local function anyEntity()
+		return if rng:chance(0.2) then rng:pick(players) else rng:pick(alive())
 	end
 
+	-- Replicated values: component, chance at spawn, and a random value (nil: none to give).
+	local values = {
+		{
+			C.Cell,
+			0.4,
+			function()
+				return rng:int(0, CELLS - 1)
+			end,
+		},
+		{
+			C.Hp,
+			0.5,
+			function()
+				return rng:int(1, 100)
+			end,
+		},
+		{
+			C.Pos,
+			0.5,
+			function()
+				return { x = rng:int(1, 99) }
+			end,
+		},
+		{
+			C.Secret,
+			0.3,
+			function()
+				return { code = rng:int(1, 999) }
+			end,
+		},
+		{ C.Target, 0.3, anyEntity },
+		{
+			C.Holder,
+			0.2,
+			function()
+				local who = anyEntity()
+				return if who then { who = who, note = "held" } else nil
+			end,
+		},
+	}
+
 	local function spawn()
-		local e = world:entity()
-		world:set(e, C.Name, "thing" .. e)
-		if rng:chance(0.3) then
-			world:add(e, Net.Public)
+		local e = h:spawn({ [C.Name] = "thing" }, nil, false)
+		for _, tag in { { Net.Public, 0.3 }, { Spatial, 0.3 }, { Fogged, 0.3 }, { Zoned, 0.2 } } do
+			if rng:chance(tag[2]) then
+				world:add(e, tag[1])
+			end
 		end
 		for _ = 1, rng:int(0, 2) do
-			world:add(e, jecs.pair(Net.Audience, rng:pick(rooms) :: number))
+			world:add(e, jecs.pair(Net.Audience, rng:pick(rooms)))
 		end
 		if rng:chance(0.3) then
-			world:add(e, jecs.pair(Net.Owner, rng:pick(players) :: number))
+			world:add(e, jecs.pair(Net.Owner, rng:pick(players)))
 		end
-		if rng:chance(0.4) then
-			world:set(e, C.Cell, rng:int(0, CELLS - 1))
-		end
-		-- Rule tags are spawn-time only (the core latches them).
-		if rng:chance(0.3) then
-			world:add(e, C.Spatial)
-		end
-		if rng:chance(0.3) then
-			world:add(e, C.Fogged)
-		end
-		if rng:chance(0.2) then
-			world:add(e, C.Zoned)
+		for _, spec in values do
+			local value = rng:chance(spec[2]) and spec[3]()
+			if value then
+				world:set(e, spec[1], value)
+			end
 		end
 		local list = alive()
 		if #list > 0 and rng:chance(0.3) then
 			-- ChildOf only to an older entity, so it stays acyclic (deletes cascade along it).
-			local parent = rng:pick(list) :: number
+			local parent = rng:pick(list)
 			world:add(e, jecs.pair(jecs.ChildOf, parent))
 			-- Usually the parent is also what it's visible through, but that's the game's choice.
 			if rng:chance(0.6) then
 				world:add(e, jecs.pair(Net.VisibleThrough, parent))
 			end
 		elseif #list > 0 and rng:chance(0.15) then
-			world:add(e, jecs.pair(Follows, rng:pick(list) :: number))
+			world:add(e, jecs.pair(Follows, rng:pick(list)))
 		end
 		if #list > 0 and not world:target(e, Net.VisibleThrough, 0) and rng:chance(0.15) then
-			world:add(e, jecs.pair(Net.VisibleThrough, rng:pick(list) :: number))
-		end
-		if rng:chance(0.5) then
-			world:set(e, C.Hp, rng:int(1, 100))
-		end
-		if rng:chance(0.5) then
-			world:set(e, C.Pos, { x = rng:int(1, 99) })
-		end
-		if rng:chance(0.3) then
-			world:set(e, C.Secret, { code = rng:int(1, 999) })
-		end
-		local target = anyEntity()
-		if target and rng:chance(0.3) then
-			world:set(e, C.Target, target)
-		end
-		local holder = anyEntity()
-		if holder and rng:chance(0.2) then
-			world:set(e, C.Holder, { who = holder, note = "held" })
+			world:add(e, jecs.pair(Net.VisibleThrough, rng:pick(list)))
 		end
 		if rng:chance(0.9) then
 			world:add(e, Net.Replicated)
@@ -229,289 +198,138 @@ function FuzzWorld.runSeed(
 
 	-- jecs 0.11.0-quenty.3 has bugs in deletes and in retargeting exclusive relations (see
 	-- experiments/jecs-findings), so deletes and retargets go through JecsWorkarounds, as a game
-	-- on that version would, and the fuzz tests the scope core rather than those bugs. ScopeHarness
-	-- checks jecs's own bookkeeping every frame. The arena scenario covers a VisibleThrough target
-	-- deleted with plain world:delete, its pairs left for jecs to remove.
-	local function delete(e: number)
+	-- on that version would, and the fuzz tests the scope core rather than those bugs. The arena
+	-- scenario covers a VisibleThrough target deleted with plain world:delete.
+	local function delete(e)
 		if useWorkarounds then
 			JecsWorkarounds.delete(world, e)
 		else
 			world:delete(e)
 		end
 	end
-
 	-- Points an exclusive relation at `target`, or removes it when `target` is nil.
-	local function setTarget(e: number, relation: number, target: number?)
+	local function setTarget(e, relation, target)
 		if useWorkarounds then
 			JecsWorkarounds.setTarget(world, e, relation, target)
-		elseif target ~= nil then
+		elseif target then
 			world:add(e, jecs.pair(relation, target))
-		else
-			local current = world:target(e, relation, 0)
-			if current then
-				world:remove(e, jecs.pair(relation, current))
-			end
+		elseif world:target(e, relation, 0) then
+			world:remove(e, jecs.pair(relation, world:target(e, relation, 0)))
 		end
 	end
-
-	local function togglePair(e: number, relation: number, target: number)
-		local id = jecs.pair(relation, target)
+	local function toggle(e, id)
 		if world:has(e, id) then
 			world:remove(e, id)
 		else
 			world:add(e, id)
 		end
 	end
+	-- An edit of a random thing.
+	local function onThing(fn)
+		return function()
+			local e = rng:pick(alive())
+			if e then
+				fn(e)
+			end
+		end
+	end
+	local function retarget(relation, pickTarget, dropChance)
+		return onThing(function(e)
+			setTarget(e, relation, if rng:chance(dropChance) then nil else pickTarget(e))
+		end)
+	end
+	local function setValue(e)
+		local spec = rng:pick(values)
+		local value = rng:chance(0.8) and spec[3]()
+		if value then
+			world:set(e, spec[1], value)
+		else
+			world:remove(e, spec[1])
+		end
+	end
 
-	local edits: { () -> () } = {
+	local edits = {
 		spawn,
-		function()
-			local e = rng:pick(alive())
-			if e then
-				delete(e)
+		onThing(delete),
+		onThing(function(e)
+			toggle(e, Net.Public)
+		end),
+		onThing(function(e)
+			toggle(e, Net.Replicated)
+		end),
+		onThing(function(e)
+			toggle(e, jecs.pair(Net.Audience, rng:pick(rooms)))
+		end),
+		onThing(function(e)
+			toggle(e, jecs.pair(Net.Owner, rng:pick(players)))
+		end),
+		onThing(function(e)
+			local value = rng:pick({ "server", "owner", rng:pick(rooms), false })
+			if value then
+				world:set(e, Net.VisibleTo, value)
+			else
+				world:remove(e, Net.VisibleTo)
 			end
+		end),
+		retarget(jecs.ChildOf, function(e) -- only to an older entity
+			local list = alive()
+			local at = table.find(list, e)
+			return if at > 1 then list[rng:int(1, at - 1)] else nil
+		end, 0.3),
+		retarget(Net.VisibleThrough, anyEntity, 0.3), -- loops allowed
+		retarget(Follows, function()
+			return rng:pick(alive())
+		end, 0.2),
+		function()
+			toggle(rng:pick(players), jecs.pair(Net.Member, rng:pick(rooms)))
 		end,
 		function()
-			local e = rng:pick(alive())
-			if e then
-				togglePair(e, Net.Audience, rng:pick(rooms) :: number)
-			end
-		end,
-		function()
-			local e = rng:pick(alive())
-			if e then
-				if world:has(e, Net.Public) then
-					world:remove(e, Net.Public)
-				else
-					world:add(e, Net.Public)
-				end
-			end
-		end,
-		function()
-			local e = rng:pick(alive())
-			if e then
-				togglePair(e, Net.Owner, rng:pick(players) :: number)
-			end
-		end,
-		function()
-			local e = rng:pick(alive())
-			if e then
-				local choice = rng:int(1, 4)
-				if choice == 1 then
-					world:set(e, Net.VisibleTo, "server")
-				elseif choice == 2 then
-					world:set(e, Net.VisibleTo, "owner")
-				elseif choice == 3 then
-					world:set(e, Net.VisibleTo, rng:pick(rooms))
-				else
-					world:remove(e, Net.VisibleTo)
-				end
-			end
-		end,
-		function()
-			local e = rng:pick(alive())
-			if e then
-				if rng:chance(0.8) then
-					world:set(e, C.Cell, rng:int(0, CELLS - 1))
-				else
-					world:remove(e, C.Cell)
-				end
-			end
-		end,
-		function()
-			local e = rng:pick(alive())
-			if e then
-				if rng:chance(0.8) then
-					world:set(e, C.Hp, rng:int(1, 100))
-				else
-					world:remove(e, C.Hp)
-				end
-			end
-		end,
-		function()
-			local e = rng:pick(alive())
-			if e then
-				if rng:chance(0.7) then
-					world:set(e, C.Secret, { code = rng:int(1, 999) })
-				else
-					world:remove(e, C.Secret)
-				end
-			end
-		end,
-		function()
-			local e = rng:pick(alive())
-			if e then
-				if rng:chance(0.8) then
-					world:set(e, C.Pos, { x = rng:int(1, 99) })
-				else
-					world:remove(e, C.Pos)
-				end
-			end
-		end,
-		function()
-			local e = rng:pick(alive())
-			local target = anyEntity()
-			if e and target then
-				if rng:chance(0.8) then
-					world:set(e, C.Target, target)
-				else
-					world:remove(e, C.Target)
-				end
-			end
-		end,
-		function()
-			local e = rng:pick(alive())
-			local who = anyEntity()
-			if e and who then
-				if rng:chance(0.8) then
-					world:set(e, C.Holder, { who = who, note = "held" })
-				else
-					world:remove(e, C.Holder)
-				end
-			end
-		end,
-		function()
-			togglePair(rng:pick(players) :: number, Net.Member, rng:pick(rooms) :: number)
-		end,
-		function()
-			world:set(rng:pick(players) :: number, C.Focus, rng:int(0, CELLS - 1))
+			world:set(rng:pick(players), C.Focus, rng:int(0, CELLS - 1))
 		end,
 		function()
 			local cells = {}
 			for _ = 1, rng:int(0, 4) do
 				cells[rng:int(0, CELLS - 1)] = true
 			end
-			world:set(rng:pick(players) :: number, C.Vision, cells)
+			world:set(rng:pick(players), C.Vision, cells)
 		end,
 		function()
-			local p = rng:pick(players) :: number
+			local p = rng:pick(players)
 			if connected[p] then
 				h:disconnect(p)
-				connected[p] = nil
 			else
 				h:connect(p)
-				connected[p] = true
 			end
-		end,
-		function()
-			local list = alive()
-			local e = rng:pick(list)
-			if e then
-				local index = table.find(list, e) :: number
-				if index > 1 and rng:chance(0.7) then
-					setTarget(e, jecs.ChildOf, list[rng:int(1, index - 1)])
-				else
-					setTarget(e, jecs.ChildOf, nil)
-				end
-			end
-		end,
-		function()
-			-- Point VisibleThrough somewhere else (cycles allowed), or drop it.
-			local e = rng:pick(alive())
-			if e then
-				if world:target(e, Net.VisibleThrough, 0) and rng:chance(0.3) then
-					setTarget(e, Net.VisibleThrough, nil)
-				else
-					local target = anyEntity()
-					if target then
-						setTarget(e, Net.VisibleThrough, target)
-					end
-				end
-			end
-		end,
-		function()
-			local e = rng:pick(alive())
-			local target = rng:pick(alive())
-			if e and target then
-				setTarget(e, Follows, if rng:chance(0.8) then target else nil)
-			end
-		end,
-		function()
-			local e = rng:pick(alive())
-			if e then
-				if world:has(e, Net.Replicated) then
-					world:remove(e, Net.Replicated)
-				else
-					world:add(e, Net.Replicated)
-				end
-			end
+			connected[p] = not connected[p]
 		end,
 	}
+	for _ = 1, #values do -- one edit per value kind, so values change as often as the rest
+		table.insert(edits, onThing(setValue))
+	end
 
-	-- Edits that can only narrow visibility.
-	local narrowing: { () -> boolean } = {
-		function()
-			local e = rng:pick(alive())
-			if e and world:has(e, Net.Public) then
-				world:remove(e, Net.Public)
-				return true
-			end
+	-- An edit that can only narrow visibility: drop a grant, a membership or rule data, or add a need.
+	-- Returns whether it changed anything.
+	local function narrow(): boolean
+		local e = rng:pick(alive())
+		local choice = rng:int(1, 7)
+		local removable = ({ Net.Member, Net.Public, C.Cell, Net.Audience, Net.Owner, Net.VisibleThrough })[choice]
+		if choice == 1 then
+			e = rng:pick(players)
+		elseif not e then
 			return false
-		end,
-		function()
-			local e = rng:pick(alive())
-			local room = e and world:target(e, Net.Audience, 0)
-			if e and room then
-				world:remove(e, jecs.pair(Net.Audience, room))
-				return true
+		elseif choice == 7 then
+			if world:has(e, Net.VisibleTo) then
+				return false
 			end
-			return false
-		end,
-		function()
-			local e = rng:pick(alive())
-			local owner = e and world:target(e, Net.Owner, 0)
-			if e and owner then
-				world:remove(e, jecs.pair(Net.Owner, owner))
-				return true
-			end
-			return false
-		end,
-		function()
-			local p = rng:pick(players) :: number
-			local room = world:target(p, Net.Member, 0)
-			if room then
-				world:remove(p, jecs.pair(Net.Member, room))
-				return true
-			end
-			return false
-		end,
-		function()
-			local e = rng:pick(alive())
-			local through = e and world:target(e, Net.VisibleThrough, 0)
-			if e and through then
-				world:remove(e, jecs.pair(Net.VisibleThrough, through))
-				return true
-			end
-			return false
-		end,
-		function()
-			local e = rng:pick(alive())
-			if e and world:has(e, C.Cell) then
-				world:remove(e, C.Cell)
-				return true
-			end
-			return false
-		end,
-		function()
-			local e = rng:pick(alive())
-			if e and not world:has(e, Net.VisibleTo) then
-				world:set(e, Net.VisibleTo, if rng:chance(0.5) then "owner" else rng:pick(rooms))
-				return true
-			end
-			return false
-		end,
-	}
-
-	local function checkNarrowing(frame: number)
-		local before = ScopeOracle.compute(jecs, world, scope, h.rules)
-		local edit = narrowing[rng:int(1, #narrowing)]
-		if edit() then
-			local after = ScopeOracle.compute(jecs, world, scope, h.rules)
-			local ok, detail = ScopeOracle.isSubset(after, before)
-			if not ok then
-				error(`seed {seed} frame {frame}: removing a constraint widened visibility: {detail}`, 0)
-			end
+			world:set(e, Net.VisibleTo, if rng:chance(0.5) then "owner" else rng:pick(rooms))
+			return true
 		end
+		local id = if choice == 2 or choice == 3
+			then removable
+			else jecs.pair(removable, world:target(e, removable, 0) or 0)
+		local had = world:has(e, id)
+		world:remove(e, id)
+		return had
 	end
 
 	for _ = 1, 15 do
@@ -526,13 +344,16 @@ function FuzzWorld.runSeed(
 
 	for frame = 1, frameCount do
 		for _ = 1, rng:int(0, 6) do
-			edits[rng:int(1, #edits)]()
+			rng:pick(edits)()
 		end
 		if rng:chance(0.3) then
-			checkNarrowing(frame)
-		end
-		if options and options.beforeStep then
-			options.beforeStep(h, frame)
+			local before = ScopeOracle.compute(world, scope)
+			if narrow() then
+				local ok, detail = ScopeOracle.isSubset(ScopeOracle.compute(world, scope), before)
+				if not ok then
+					error(`seed {seed} frame {frame}: removing a constraint widened visibility: {detail}`, 0)
+				end
+			end
 		end
 		local ok, err = pcall(h.step, h)
 		if not ok then

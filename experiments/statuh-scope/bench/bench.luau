@@ -133,8 +133,14 @@ local function run(
 	for _, p in players do
 		scope.addViewer(p)
 	end
-	local _, joinStats = scope.frame()
+	local joinOut = scope.frame()
 	local joinMs = (os.clock() - t0) * 1000
+	local joinEnters = 0
+	for _, list in joinOut do
+		for _, message in list do
+			joinEnters += if message[1] == "ENTER" then 1 else 0
+		end
+	end
 
 	local times = {}
 	local messages = 0
@@ -167,12 +173,11 @@ local function run(
 			end
 		end
 		local start = os.clock()
-		local out, stats = scope.frame()
+		local out = scope.frame()
 		table.insert(times, (os.clock() - start) * 1000)
 		for _, list in out do
 			messages += #list
 		end
-		local _ = stats
 	end
 	table.sort(times)
 	local sum = 0
@@ -184,7 +189,7 @@ local function run(
 			"%-34s join %7.1f ms (%d ENTERs) | per frame: avg %.2f ms, p50 %.2f, p95 %.2f, max %.2f | %.0f messages/frame",
 			label,
 			joinMs,
-			joinStats.enters,
+			joinEnters,
 			sum / #times,
 			times[math.ceil(#times * 0.5)],
 			times[math.ceil(#times * 0.95)],

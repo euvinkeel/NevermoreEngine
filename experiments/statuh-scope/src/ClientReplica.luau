@@ -7,62 +7,40 @@
 	Protocol checks:
 	- Messages come in phase order: ENTER, SET/HIDE/REM, PAIR_REM/PAIR_ADD, LEAVE, DEL, ROLLBACK.
 	- Every net id a message mentions (subject, pair target, reference value) is one this client has
-	  at that point, except the subject of ENTER and ROLLBACK. REDACTED stands in for hidden ones.
-	- HIDE and REM only remove a component the client holds. Both are recorded by kind, so tests
-	  can tell "hidden from this client" (HIDE) from "removed" (REM).
-	- LEAVE and DEL remove an entity the client has, and strip pairs pointing at it without any
-	  cleanup cascade. Removals are recorded by kind so tests can tell LEAVE from DEL.
+	  at that point, except the subject of ENTER and ROLLBACK. REDACTED stands in for the others.
+	- HIDE and REM only remove a component the client holds, and LEAVE and DEL an entity it has.
+	  Each is recorded by kind, so tests can tell "hidden from you" from "removed".
+	- Losing an entity strips pairs to it and redacts references to it, with no cleanup cascade.
 ]]
 
 local StatuhScope = require("./StatuhScope")
 
 local REDACTED = StatuhScope.REDACTED
 
-local PHASE = {
-	ENTER = 1,
-	SET = 2,
-	HIDE = 2,
-	REM = 2,
-	PAIR_REM = 3,
-	PAIR_ADD = 3,
-	LEAVE = 4,
-	DEL = 5,
-	ROLLBACK = 6,
-}
-
--- Iterates a table that may be nil (the old solver can't iterate `t or {}`).
-local function orEmpty<K, V>(t: { [K]: V }?): { [K]: V }
-	return (t or {}) :: any
-end
-
-local ClientReplica = {}
-ClientReplica.__index = ClientReplica
+local PHASE = { ENTER = 1, SET = 2, HIDE = 2, REM = 2, PAIR_REM = 3, PAIR_ADD = 3, LEAVE = 4, DEL = 5, ROLLBACK = 6 }
 
 export type ReplicaEntity = {
 	comps: { [number]: any },
 	pairs: { [number]: { [number]: boolean } },
 }
 
+type Removal = { kind: string, netId: number, key: number? }
+
+local ClientReplica = {}
+ClientReplica.__index = ClientReplica
+
 export type ClientReplica = typeof(setmetatable(
 	{} :: {
 		entities: { [number]: ReplicaEntity },
-		removals: { { kind: string, netId: number, frame: number } },
-		componentRemovals: { { kind: string, netId: number, key: number, frame: number } },
-		frame: number,
-		refFields: { [number]: { string } | boolean },
+		removals: { Removal },
+		components: { { refs: (boolean | { string })? } },
 	},
 	ClientReplica
 ))
 
--- `refFields` maps component key -> true (whole value is a ref) or a list of ref fields.
-function ClientReplica.new(refFields: { [number]: { string } | boolean }): ClientReplica
-	return setmetatable({
-		entities = {},
-		removals = {},
-		componentRemovals = {},
-		frame = 0,
-		refFields = refFields,
-	}, ClientReplica)
+-- `components` is the scope's replicated component list (key -> its `refs`).
+function ClientReplica.new(components: { { refs: (boolean | { string })? } }): ClientReplica
+	return setmetatable({ entities = {}, removals = {}, components = components }, ClientReplica)
 end
 
 local function describe(message: { any }): string
@@ -74,25 +52,12 @@ local function describe(message: { any }): string
 end
 
 function ClientReplica._checkRefs(self: ClientReplica, key: number, value: any, message: { any })
-	local spec = self.refFields[key]
-	if not spec or value == nil then
-		return
-	end
-	local refs = {}
-	if spec == true then
-		table.insert(refs, value)
-	elseif type(value) == "table" then
-		for _, field in spec :: { string } do
-			if value[field] ~= nil then
-				table.insert(refs, value[field])
-			end
-		end
-	end
-	for _, ref in refs do
+	StatuhScope.mapRefs(self.components[key].refs, value, function(ref)
 		if ref ~= REDACTED and not self.entities[ref] then
 			error(`reference to net id {ref} the client doesn't have, in: {describe(message)}`, 0)
 		end
-	end
+		return ref
+	end)
 end
 
 function ClientReplica._remove(self: ClientReplica, netId: number, kind: string)
@@ -101,102 +66,91 @@ function ClientReplica._remove(self: ClientReplica, netId: number, kind: string)
 		for _, targets in entity.pairs do
 			targets[netId] = nil
 		end
+		for key, value in entity.comps do
+			entity.comps[key] = StatuhScope.mapRefs(self.components[key].refs, value, function(ref)
+				return if ref == netId then REDACTED else ref
+			end)
+		end
 	end
-	table.insert(self.removals, { kind = kind, netId = netId, frame = self.frame })
+	table.insert(self.removals, { kind = kind, netId = netId })
 end
 
 function ClientReplica.apply(self: ClientReplica, messages: { { any } }?)
-	self.frame += 1
 	local phase = 0
-	for _, message in orEmpty(messages) do
-		local kind = message[1]
-		local netId = message[2]
+	for _, message in messages or {} :: { { any } } do
+		local kind: string, netId, key = message[1], message[2], message[3]
 		local messagePhase = PHASE[kind]
 		if not messagePhase then
 			error(`unknown message {kind}`, 0)
-		end
-		if messagePhase < phase then
+		elseif messagePhase < phase then
 			error(`{kind} after a later phase, in: {describe(message)}`, 0)
 		end
 		phase = messagePhase
 		local entity = self.entities[netId]
-
 		if kind == "ENTER" then
 			if entity then
 				error(`ENTER for net id {netId} the client already has`, 0)
 			end
-			local comps = {}
-			for key, value in message[3] do
-				comps[key] = value
-			end
-			self.entities[netId] = { comps = comps, pairs = {} }
-			for key, value in comps do
-				self:_checkRefs(key, value, message)
+			self.entities[netId] = { comps = table.clone(message[3]), pairs = {} }
+			for k, value in message[3] do
+				self:_checkRefs(k, value, message)
 			end
 		elseif kind == "ROLLBACK" then
-			table.insert(self.removals, { kind = kind :: string, netId = netId :: number, frame = self.frame })
-		else
-			if not entity then
-				error(`{kind} for net id {netId} the client doesn't have`, 0)
+			table.insert(self.removals, { kind = kind :: string, netId = netId })
+		elseif not entity then
+			error(`{kind} for net id {netId} the client doesn't have`, 0)
+		elseif kind == "SET" then
+			entity.comps[key] = message[4]
+			self:_checkRefs(key, message[4], message)
+		elseif kind == "REM" or kind == "HIDE" then
+			if entity.comps[key] == nil then
+				error(`{kind} for a component the client doesn't hold: {describe(message)}`, 0)
 			end
-			if kind == "SET" then
-				entity.comps[message[3]] = message[4]
-				self:_checkRefs(message[3], message[4], message)
-			elseif kind == "REM" or kind == "HIDE" then
-				local key = message[3]
-				if entity.comps[key] == nil then
-					error(`{kind} for a component the client doesn't hold: {describe(message)}`, 0)
-				end
-				entity.comps[key] = nil
-				table.insert(
-					self.componentRemovals,
-					{ kind = kind :: string, netId = netId :: number, key = key :: number, frame = self.frame }
+			entity.comps[key] = nil
+			table.insert(self.removals, { kind = kind :: string, netId = netId, key = key })
+		elseif kind == "PAIR_ADD" or kind == "PAIR_REM" then
+			local target = message[4]
+			if not self.entities[target] then
+				error(`{kind} to net id {target} the client doesn't have`, 0)
+			end
+			local set = entity.pairs[key] or {}
+			entity.pairs[key] = set
+			if (kind == "PAIR_ADD") == (set[target] == true) then
+				error(
+					`{if set[target] then "duplicate PAIR_ADD" else "PAIR_REM for a missing pair"}: {describe(message)}`,
+					0
 				)
-			elseif kind == "PAIR_ADD" or kind == "PAIR_REM" then
-				local target = message[4]
-				if not self.entities[target] then
-					error(`{kind} to net id {target} the client doesn't have`, 0)
-				end
-				local key = message[3]
-				local set = entity.pairs[key]
-				if kind == "PAIR_ADD" then
-					if set and set[target] then
-						error(`duplicate PAIR_ADD: {describe(message)}`, 0)
-					end
-					local pairsOfKey: { [number]: boolean } = set or {}
-					entity.pairs[key] = pairsOfKey
-					pairsOfKey[target] = true
-				else
-					if not (set and set[target]) then
-						error(`PAIR_REM for a pair the client doesn't have: {describe(message)}`, 0)
-					end
-					set[target] = nil
-				end
-			elseif kind == "LEAVE" or kind == "DEL" then
-				self:_remove(netId, kind)
 			end
+			set[target] = if kind == "PAIR_ADD" then true else nil
+		else -- LEAVE or DEL
+			self:_remove(netId, kind)
 		end
 	end
 end
 
-local function sameValue(a: any, b: any): boolean
-	if a == b then
-		return true
-	end
-	if type(a) ~= "table" or type(b) ~= "table" then
-		return false
-	end
-	for k, v in a do
-		if not sameValue(v, b[k]) then
-			return false
+-- The kind of the last removal of an entity (key nil) or of one of its components.
+function ClientReplica.lastRemoval(self: ClientReplica, netId: number, key: number?): string?
+	for i = #self.removals, 1, -1 do
+		local removal = self.removals[i]
+		if removal.netId == netId and removal.key == key then
+			return removal.kind
 		end
 	end
-	for k in b do
-		if a[k] == nil then
-			return false
-		end
+	return nil
+end
+
+local function show(value: any): string
+	if value == REDACTED then
+		return "REDACTED"
+	elseif type(value) ~= "table" then
+		return tostring(value)
 	end
-	return true
+	local parts = {}
+	for k, v in value do
+		table.insert(parts, `{k}={show(v)}`)
+	end
+	table.sort(parts)
+	return "{" .. table.concat(parts, ",") .. "}"
 end
 
 --[=[
@@ -214,53 +168,18 @@ function ClientReplica.compareWithProjection(self: ClientReplica, expected: { [n
 		if not have then
 			return `client is missing net id {netId}`
 		end
-		if not sameValue(have.comps, want.comps) then
-			local function show(value: any): string
-				if value == REDACTED then
-					return "REDACTED"
-				elseif type(value) == "table" then
-					local parts = {}
-					for k, v in value do
-						table.insert(parts, `{k}={show(v)}`)
-					end
-					table.sort(parts)
-					return "{" .. table.concat(parts, ",") .. "}"
-				end
-				return tostring(value)
-			end
-			local keys = {}
-			for key in have.comps do
-				keys[key] = true
-			end
-			for key in want.comps do
-				keys[key] = true
-			end
-			for key in keys do
-				if not sameValue(have.comps[key], want.comps[key]) then
-					return `net id {netId} component {key}: client has {show(have.comps[key])}, expected {show(
-						want.comps[key]
-					)}`
-				end
-			end
-		end
 		local havePairs = {}
 		for key, targets in have.pairs do
 			if next(targets) then
 				havePairs[key] = targets
 			end
 		end
-		if not sameValue(havePairs, want.pairs) then
-			local function show(set: { [number]: { [number]: boolean } }): string
-				local parts = {}
-				for key, targets in set do
-					for target in targets do
-						table.insert(parts, `{key}->{target}`)
-					end
-				end
-				table.sort(parts)
-				return "{" .. table.concat(parts, ",") .. "}"
+		for label, sides in
+			{ comps = { have.comps, want.comps }, pairs = { havePairs, want.pairs } } :: { [string]: { any } }
+		do
+			if show(sides[1]) ~= show(sides[2]) then
+				return `net id {netId} {label}: client has {show(sides[1])}, expected {show(sides[2])}`
 			end
-			return `net id {netId} pairs differ: client has {show(havePairs)}, expected {show(want.pairs)}`
 		end
 	end
 	return nil
