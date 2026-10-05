@@ -46,11 +46,10 @@ export type Config = {
 	datatypes: { [string]: any },
 	-- roblox.getReflectionDatabase() from @lune/roblox.
 	reflection: any,
-	-- Event and method names from the luau-lsp definitions, if available (see RobloxApi).
-	api: RobloxApi.Api?,
+	-- Event, method and property names from the luau-lsp definitions (see RobloxApi).
+	api: RobloxApi.Api,
 	-- When `datatypes.Enum` is an EnumShim, the shim (for typeof and converting Lune EnumItems).
 	enumShim: EnumShim.Shim?,
-	onStrayError: (message: string) -> (),
 }
 
 local KIND_INSTANCE = "Instance"
@@ -101,15 +100,6 @@ function FakeDataModel.new(config: Config)
 			proxyMeta[key] = value
 		end
 		return proxy
-	end
-
-	local function runHandler(fn: (...any) -> ...any, ...: any)
-		local ok, err = xpcall(fn, function(e)
-			return debug.traceback(tostring(e), 2)
-		end, ...)
-		if not ok then
-			config.onStrayError(err)
-		end
 	end
 
 	local function checkUsable(state: SignalState)
@@ -201,30 +191,28 @@ function FakeDataModel.new(config: Config)
 		return signal
 	end
 
-	local function resume(fnOrThread: any, ...: any)
-		if signalMode == "deferred" then
-			taskLib.defer(fnOrThread, ...)
-		else
-			taskLib.spawn(fnOrThread, ...)
-		end
-	end
-
-	-- Handlers are captured when the event fires; a deferred handler still runs if its connection
-	-- is disconnected before the resumption point (Destroy disconnects everything right away).
-	local function fire(signal: any, ...: any)
+	-- Runs every handler and resumes every waiting thread through `run` (the scheduler's task.spawn
+	-- or task.defer, which report a handler's error as a stray error). Handlers are captured when
+	-- the event fires; a deferred handler still runs if its connection is disconnected before the
+	-- resumption point (Destroy disconnects everything right away).
+	local function fireThrough(run: (any, ...any) -> any, signal: any, ...: any)
 		local state = signalStates[signal]
 		if #state.connections == 0 and #state.waiting == 0 then
 			return
 		end
-		local snapshot = table.clone(state.connections)
+		local connections = table.clone(state.connections)
 		local threads = table.clone(state.waiting)
 		table.clear(state.waiting)
-		for _, connection in snapshot do
-			resume(runHandler, connectionStates[connection].fn, ...)
+		for _, connection in connections do
+			run(connectionStates[connection].fn, ...)
 		end
 		for _, thread in threads do
-			resume(thread, ...)
+			run(thread, ...)
 		end
+	end
+
+	local function fire(signal: any, ...: any)
+		fireThrough(if signalMode == "deferred" then taskLib.defer else taskLib.spawn, signal, ...)
 	end
 
 	local function disconnectAll(signal: any)
@@ -237,8 +225,8 @@ function FakeDataModel.new(config: Config)
 	--
 	-- Class names, superclasses, NotCreatable/Service tags, scriptable properties, their types and
 	-- defaults come from the reflection database bundled with @lune/roblox (rbx-dom). It has no
-	-- events or methods: the events below are declared by hand, and methods are implemented further
-	-- down. An event that isn't declared here is "not a valid member".
+	-- events or methods: those names come from the luau-lsp definitions (`api`), and the methods
+	-- this fake implements are further down.
 
 	local database = config.reflection
 	local api = config.api
@@ -255,104 +243,6 @@ function FakeDataModel.new(config: Config)
 		creatable: boolean,
 		service: boolean,
 		properties: { [string]: PropertyInfo }, -- declared on this class only
-		events: { [string]: true }, -- declared on this class only
-	}
-
-	local EVENTS: { [string]: { string } } = {
-		Instance = {
-			"Changed",
-			"ChildAdded",
-			"ChildRemoved",
-			"DescendantAdded",
-			"DescendantRemoving",
-			"AncestryChanged",
-			"AttributeChanged",
-			"Destroying",
-		},
-		DataModel = { "Close", "Loaded" },
-		BasePart = { "Touched", "TouchEnded" },
-		Humanoid = {
-			"Died",
-			"HealthChanged",
-			"StateChanged",
-			"StateEnabledChanged",
-			"Running",
-			"Jumping",
-			"Seated",
-			"Climbing",
-			"FreeFalling",
-			"FallingDown",
-			"GettingUp",
-			"PlatformStanding",
-			"Ragdoll",
-			"Strafing",
-			"Swimming",
-			"MoveToFinished",
-			"AnimationPlayed",
-		},
-		Players = { "PlayerAdded", "PlayerRemoving", "PlayerMembershipChanged" },
-		Player = { "CharacterAdded", "CharacterRemoving", "CharacterAppearanceLoaded", "Chatted", "Idled" },
-		Team = { "PlayerAdded", "PlayerRemoved" },
-		RemoteEvent = { "OnServerEvent", "OnClientEvent" },
-		UnreliableRemoteEvent = { "OnServerEvent", "OnClientEvent" },
-		BindableEvent = { "Event" },
-		Tool = { "Activated", "Deactivated", "Equipped", "Unequipped" },
-		Sound = { "Played", "Paused", "Resumed", "Stopped", "Ended", "Loaded", "DidLoop" },
-		AnimationTrack = { "Stopped", "Ended", "KeyframeReached", "DidLoop" },
-		Animator = { "AnimationPlayed" },
-		GuiObject = {
-			"InputBegan",
-			"InputChanged",
-			"InputEnded",
-			"MouseEnter",
-			"MouseLeave",
-			"MouseMoved",
-			"SelectionGained",
-			"SelectionLost",
-		},
-		GuiButton = {
-			"Activated",
-			"MouseButton1Click",
-			"MouseButton1Down",
-			"MouseButton1Up",
-			"MouseButton2Click",
-			"MouseButton2Down",
-			"MouseButton2Up",
-		},
-		TextBox = { "FocusLost", "Focused", "ReturnPressedFromOnScreenKeyboard" },
-		ProximityPrompt = {
-			"Triggered",
-			"TriggerEnded",
-			"PromptButtonHoldBegan",
-			"PromptButtonHoldEnded",
-			"PromptShown",
-			"PromptHidden",
-		},
-		ClickDetector = { "MouseClick", "RightMouseClick", "MouseHoverEnter", "MouseHoverLeave" },
-		Camera = { "InterpolationFinished" },
-		RunService = {
-			"Heartbeat",
-			"Stepped",
-			"RenderStepped",
-			"PreRender",
-			"PreAnimation",
-			"PreSimulation",
-			"PostSimulation",
-		},
-		CollectionService = { "TagAdded", "TagRemoved" },
-		UserInputService = {
-			"InputBegan",
-			"InputChanged",
-			"InputEnded",
-			"LastInputTypeChanged",
-			"TextBoxFocused",
-			"TextBoxFocusReleased",
-			"WindowFocused",
-			"WindowFocusReleased",
-		},
-		GuiService = { "MenuOpened", "MenuClosed" },
-		LogService = { "MessageOut" },
-		ScriptContext = { "Error" },
 	}
 
 	-- The Enum by that name, or nil (Lune's and the shim's Enum both throw for unknown names).
@@ -401,7 +291,6 @@ function FakeDataModel.new(config: Config)
 			creatable = not table.find(reflected.Tags, "NotCreatable"),
 			service = table.find(reflected.Tags, "Service") ~= nil,
 			properties = {},
-			events = {},
 		}
 		local defaults = reflected.DefaultProperties
 		for propertyName, property in reflected.Properties do
@@ -423,10 +312,6 @@ function FakeDataModel.new(config: Config)
 					default = if default == nil then typeDefault(property.Datatype) else default,
 				}
 			end
-		end
-		local declaredEvents: { string } = EVENTS[name] or {}
-		for _, event in declaredEvents do
-			info.events[event] = true
 		end
 		classes[name] = info
 		return info
@@ -460,36 +345,15 @@ function FakeDataModel.new(config: Config)
 		return nil
 	end
 
-	local function hasEvent(className: string, event: string): boolean
-		local current: string? = className
-		while current do
-			local info = classInfo(current)
-			if not info then
-				return false
-			end
-			if info.events[event] then
-				return true
-			end
-			local apiClass = api and api[current]
-			if apiClass and apiClass.events[event] then
-				return true
-			end
-			current = info.super
-		end
-		return false
-	end
-
-	-- "method" or "property" when the real class has a member by that name that this fake doesn't
-	-- implement (per the definitions file); nil otherwise.
-	local function unemulatedMember(className: string, key: string): string?
-		if not api then
-			return nil
-		end
+	-- What the real class has by this name, per the definitions: "event", "method" or "property".
+	local function apiMember(className: string, key: string): string?
 		local current: string? = className
 		while current do
 			local apiClass = api[current]
 			if apiClass then
-				if apiClass.methods[key] then
+				if apiClass.events[key] then
+					return "event"
+				elseif apiClass.methods[key] then
 					return "method"
 				elseif apiClass.properties[key] then
 					return "property"
@@ -577,9 +441,9 @@ function FakeDataModel.new(config: Config)
 		properties: { [string]: any }, -- written values only (NIL for nil); reads fall back to defaults
 		attributes: { [string]: any },
 		tags: { [string]: boolean },
+		-- Signals made so far, by event name, "Changed:<property>" (GetPropertyChangedSignal) and
+		-- "AttributeChanged:<name>" (GetAttributeChangedSignal).
 		signals: { [string]: any },
-		propertySignals: { [string]: any },
-		attributeSignals: { [string]: any },
 		destroyed: boolean,
 		parentLocked: boolean,
 		callbacks: { [string]: any },
@@ -591,7 +455,6 @@ function FakeDataModel.new(config: Config)
 	local Methods: { [string]: (...any) -> ...any } = {}
 
 	local game: any -- the DataModel, created below
-	local collection: any -- CollectionService internals, set below
 	local onTagPresence: (instance: any, tag: string, present: boolean) -> () = function() end
 
 	local function stateFor(instance: any): State
@@ -642,48 +505,43 @@ function FakeDataModel.new(config: Config)
 		return true, value
 	end
 
-	local function getSignal(state: State, name: string): any
-		local signal = state.signals[name]
+	local function getSignal(state: State, key: string): any
+		local signal = state.signals[key]
 		if not signal then
-			signal = newSignal(state.name .. "." .. name)
-			state.signals[name] = signal
+			signal = newSignal(state.name .. "." .. key)
+			state.signals[key] = signal
 		end
 		return signal
 	end
 
-	local function firePropertyChanged(instance: any, state: State, property: string, value: any)
-		local propertySignal = state.propertySignals[property]
-		if propertySignal then
-			fire(propertySignal)
+	-- Fires the instance's signal for `key`, if it was ever made.
+	local function fireKey(state: State, key: string, ...: any)
+		local signal = state.signals[key]
+		if signal then
+			fire(signal, ...)
 		end
-		local changed = state.signals.Changed
-		if changed then
-			if isA(state.className, "ValueBase") and property == "Value" then
-				fire(changed, value)
-			elseif not isA(state.className, "ValueBase") then
-				fire(changed, property)
-			end
+	end
+
+	local function firePropertyChanged(state: State, property: string, value: any)
+		fireKey(state, "Changed:" .. property)
+		if not isA(state.className, "ValueBase") then
+			fireKey(state, "Changed", property)
+		elseif property == "Value" then
+			fireKey(state, "Changed", value)
 		end
 	end
 
 	local function newInstance(className: string): any
-		local proxy = newproxy(true)
-		local meta = getmetatable(proxy)
-		for key, value in InstanceMeta do
-			meta[key] = value
-		end
-		local properties = {}
+		local proxy = newUserdata(InstanceMeta)
 		stateOf[proxy] = {
 			className = className,
 			name = className,
 			parent = nil,
 			children = {},
-			properties = properties,
+			properties = {},
 			attributes = {},
 			tags = {},
 			signals = {},
-			propertySignals = {},
-			attributeSignals = {},
 			destroyed = false,
 			parentLocked = false,
 			callbacks = {},
@@ -691,6 +549,14 @@ function FakeDataModel.new(config: Config)
 		}
 		kinds[proxy] = KIND_INSTANCE
 		return proxy
+	end
+
+	-- A new instance of the same class, with the same name and written properties.
+	local function copyInstance(source: State): any
+		local copy = newInstance(source.className)
+		stateOf[copy].name = source.name
+		stateOf[copy].properties = table.clone(source.properties)
+		return copy
 	end
 
 	local function eachDescendant(instance: any, fn: (any) -> ())
@@ -749,13 +615,10 @@ function FakeDataModel.new(config: Config)
 		-- DescendantRemoving fires on the old ancestors before the move.
 		local ancestor = oldParent
 		while ancestor do
-			local ancestorState = stateOf[ancestor]
-			if ancestorState.signals.DescendantRemoving then
-				for _, d in moved do
-					fire(ancestorState.signals.DescendantRemoving, d)
-				end
+			for _, d in moved do
+				fireKey(stateOf[ancestor], "DescendantRemoving", d)
 			end
-			ancestor = ancestorState.parent
+			ancestor = stateOf[ancestor].parent
 		end
 
 		if oldParent then
@@ -770,29 +633,23 @@ function FakeDataModel.new(config: Config)
 			table.insert(stateOf[newParent].children, instance)
 		end
 
-		if oldParent and stateOf[oldParent].signals.ChildRemoved then
-			fire(stateOf[oldParent].signals.ChildRemoved, instance)
+		if oldParent then
+			fireKey(stateOf[oldParent], "ChildRemoved", instance)
 		end
-		if newParent and stateOf[newParent].signals.ChildAdded then
-			fire(stateOf[newParent].signals.ChildAdded, instance)
+		if newParent then
+			fireKey(stateOf[newParent], "ChildAdded", instance)
 		end
 		ancestor = newParent
 		while ancestor do
-			local ancestorState = stateOf[ancestor]
-			if ancestorState.signals.DescendantAdded then
-				for _, d in moved do
-					fire(ancestorState.signals.DescendantAdded, d)
-				end
+			for _, d in moved do
+				fireKey(stateOf[ancestor], "DescendantAdded", d)
 			end
-			ancestor = ancestorState.parent
+			ancestor = stateOf[ancestor].parent
 		end
 		for _, d in moved do
-			local s = stateOf[d]
-			if s.signals.AncestryChanged then
-				fire(s.signals.AncestryChanged, instance, newParent)
-			end
+			fireKey(stateOf[d], "AncestryChanged", instance, newParent)
 		end
-		firePropertyChanged(instance, state, "Parent", newParent)
+		firePropertyChanged(state, "Parent", newParent)
 
 		local nowInDataModel = inDataModel(instance)
 		if wasInDataModel ~= nowInDataModel then
@@ -875,75 +732,59 @@ function FakeDataModel.new(config: Config)
 		end
 		return table.concat(parts, ".")
 	end
-	function Methods.FindFirstChild(self: any, name: string, recursive: boolean?): any
-		for _, child in stateFor(self).children do
-			if stateOf[child].name == name then
+	-- The first child for which `matches` holds; with `recursive`, then the same in each child.
+	local function findChild(state: State, matches: (State) -> boolean, recursive: boolean?): any
+		for _, child in state.children do
+			if matches(stateOf[child]) then
 				return child
 			end
 		end
 		if recursive then
-			for _, child in stateOf[self].children do
-				local found = Methods.FindFirstChild(child, name, true)
+			for _, child in state.children do
+				local found = findChild(stateOf[child], matches, true)
 				if found then
 					return found
 				end
 			end
 		end
 		return nil
+	end
+	local function findAncestor(state: State, matches: (State) -> boolean): any
+		local current = state.parent
+		while current and not matches(stateOf[current]) do
+			current = stateOf[current].parent
+		end
+		return current
+	end
+	function Methods.FindFirstChild(self: any, name: string, recursive: boolean?): any
+		return findChild(stateFor(self), function(child)
+			return child.name == name
+		end, recursive)
 	end
 	function Methods.FindFirstChildOfClass(self: any, className: string): any
-		for _, child in stateFor(self).children do
-			if stateOf[child].className == className then
-				return child
-			end
-		end
-		return nil
+		return findChild(stateFor(self), function(child)
+			return child.className == className
+		end)
 	end
 	function Methods.FindFirstChildWhichIsA(self: any, className: string, recursive: boolean?): any
-		for _, child in stateFor(self).children do
-			if isA(stateOf[child].className, className) then
-				return child
-			end
-		end
-		if recursive then
-			for _, child in stateOf[self].children do
-				local found = Methods.FindFirstChildWhichIsA(child, className, true)
-				if found then
-					return found
-				end
-			end
-		end
-		return nil
+		return findChild(stateFor(self), function(child)
+			return isA(child.className, className)
+		end, recursive)
 	end
 	function Methods.FindFirstAncestor(self: any, name: string): any
-		local current = stateFor(self).parent
-		while current do
-			if stateOf[current].name == name then
-				return current
-			end
-			current = stateOf[current].parent
-		end
-		return nil
+		return findAncestor(stateFor(self), function(ancestor)
+			return ancestor.name == name
+		end)
 	end
 	function Methods.FindFirstAncestorOfClass(self: any, className: string): any
-		local current = stateFor(self).parent
-		while current do
-			if stateOf[current].className == className then
-				return current
-			end
-			current = stateOf[current].parent
-		end
-		return nil
+		return findAncestor(stateFor(self), function(ancestor)
+			return ancestor.className == className
+		end)
 	end
 	function Methods.FindFirstAncestorWhichIsA(self: any, className: string): any
-		local current = stateFor(self).parent
-		while current do
-			if isA(stateOf[current].className, className) then
-				return current
-			end
-			current = stateOf[current].parent
-		end
-		return nil
+		return findAncestor(stateFor(self), function(ancestor)
+			return isA(ancestor.className, className)
+		end)
 	end
 	function Methods.WaitForChild(self: any, name: string, timeout: number?): any
 		local found = Methods.FindFirstChild(self, name)
@@ -953,7 +794,7 @@ function FakeDataModel.new(config: Config)
 		local thread = coroutine.running()
 		local done = false
 		local connection
-		connection = Methods.GetSignalFor(self, "ChildAdded"):Connect(function(child)
+		connection = getSignal(stateFor(self), "ChildAdded"):Connect(function(child)
 			if not done and stateOf[child].name == name then
 				done = true
 				connection:Disconnect()
@@ -1008,12 +849,7 @@ function FakeDataModel.new(config: Config)
 		then
 			error(`{property} is not a valid property name.`, 2)
 		end
-		local signal = state.propertySignals[property]
-		if not signal then
-			signal = newSignal(state.name .. "." .. property .. "Changed")
-			state.propertySignals[property] = signal
-		end
-		return signal
+		return getSignal(state, "Changed:" .. property)
 	end
 	function Methods.GetAttribute(self: any, name: string): any
 		return stateFor(self).attributes[name]
@@ -1028,21 +864,11 @@ function FakeDataModel.new(config: Config)
 			return
 		end
 		state.attributes[name] = value
-		if state.attributeSignals[name] then
-			fire(state.attributeSignals[name])
-		end
-		if state.signals.AttributeChanged then
-			fire(state.signals.AttributeChanged, name)
-		end
+		fireKey(state, "AttributeChanged:" .. name)
+		fireKey(state, "AttributeChanged", name)
 	end
 	function Methods.GetAttributeChangedSignal(self: any, name: string): any
-		local state = stateFor(self)
-		local signal = state.attributeSignals[name]
-		if not signal then
-			signal = newSignal(state.name .. ".Attribute." .. name)
-			state.attributeSignals[name] = signal
-		end
-		return signal
+		return getSignal(stateFor(self), "AttributeChanged:" .. name)
 	end
 	function Methods.AddTag(self: any, tag: string)
 		local state = stateFor(self)
@@ -1078,9 +904,7 @@ function FakeDataModel.new(config: Config)
 		if state.destroyed then
 			return
 		end
-		if state.signals.Destroying then
-			fire(state.signals.Destroying)
-		end
+		fireKey(state, "Destroying")
 		for _, child in table.clone(state.children) do
 			Methods.Destroy(child)
 		end
@@ -1089,12 +913,6 @@ function FakeDataModel.new(config: Config)
 		state.parentLocked = true
 		state.destroyed = true
 		for _, signal in state.signals do
-			disconnectAll(signal)
-		end
-		for _, signal in state.propertySignals do
-			disconnectAll(signal)
-		end
-		for _, signal in state.attributeSignals do
 			disconnectAll(signal)
 		end
 	end
@@ -1109,12 +927,8 @@ function FakeDataModel.new(config: Config)
 		local map: { [any]: any } = {}
 		local function cloneTree(source: any): any
 			local sourceState = stateOf[source]
-			local copy = newInstance(sourceState.className)
+			local copy = copyInstance(sourceState)
 			local copyState = stateOf[copy]
-			copyState.name = sourceState.name
-			for k, v in sourceState.properties do
-				copyState.properties[k] = v
-			end
 			copyState.attributes = table.clone(sourceState.attributes)
 			copyState.tags = table.clone(sourceState.tags)
 			map[source] = copy
@@ -1158,10 +972,6 @@ function FakeDataModel.new(config: Config)
 		elseif findProperty(state.className, "WorldPivot") then
 			self.WorldPivot = cframe
 		end
-	end
-	-- Internal: event by name with the same lookup as `instance.Event`.
-	function Methods.GetSignalFor(self: any, name: string): any
-		return getSignal(stateFor(self), name)
 	end
 
 	-- Class-specific methods.
@@ -1221,18 +1031,17 @@ function FakeDataModel.new(config: Config)
 			)
 		end
 		local method = methodFor(state.className, key)
-		if method and key ~= "GetSignalFor" then
+		if method then
 			return method
 		end
-		if hasEvent(state.className, key) then
+		local member = apiMember(state.className, key)
+		if member == "event" then
 			return getSignal(state, key)
-		end
-		local unemulated = unemulatedMember(state.className, key)
-		if unemulated == "method" then
+		elseif member == "method" then
 			return function()
 				error(`[lune-headless] {state.className}:{key}() is not emulated at host level "datamodel"`, 2)
 			end
-		elseif unemulated == "property" then
+		elseif member == "property" then
 			error(`[lune-headless] {state.className}.{key} is not emulated at host level "datamodel"`, 2)
 		end
 		for _, child in state.children do
@@ -1255,7 +1064,7 @@ function FakeDataModel.new(config: Config)
 			local name = tostring(value)
 			if state.name ~= name then
 				state.name = name
-				firePropertyChanged(self, state, "Name", name)
+				firePropertyChanged(state, "Name", name)
 			end
 			return
 		elseif key == "ClassName" then
@@ -1263,15 +1072,14 @@ function FakeDataModel.new(config: Config)
 		end
 		if CALLBACKS[key] and isA(state.className, CALLBACKS[key]) then
 			state.callbacks[key] = value
-			local setSignal = state.signals.__OnInvokeSet
-			if setSignal and value ~= nil then
-				fire(setSignal)
+			if value ~= nil then
+				fireKey(state, "__OnInvokeSet")
 			end
 			return
 		end
 		local info = findProperty(state.className, key)
 		if not info then
-			if unemulatedMember(state.className, key) == "property" then
+			if apiMember(state.className, key) == "property" then
 				error(`[lune-headless] {state.className}.{key} is not emulated at host level "datamodel"`, 2)
 			end
 			error(`{tostring(key)} is not a valid member of {state.className} "{Methods.GetFullName(self)}"`, 2)
@@ -1284,17 +1092,17 @@ function FakeDataModel.new(config: Config)
 		local new = if stored == NIL then nil else stored
 		state.properties[key] = stored
 		if old ~= new then
-			firePropertyChanged(self, state, key, new)
+			firePropertyChanged(state, key, new)
 			-- Keep BasePart Position and CFrame in step.
 			if isA(state.className, "BasePart") then
 				if key == "CFrame" then
 					state.properties.Position = new.Position
-					firePropertyChanged(self, state, "Position", new.Position)
+					firePropertyChanged(state, "Position", new.Position)
 				elseif key == "Position" then
 					local _, cframe = readProperty(state, "CFrame")
 					cframe = cframe - cframe.Position + new
 					state.properties.CFrame = cframe
-					firePropertyChanged(self, state, "CFrame", cframe)
+					firePropertyChanged(state, "CFrame", cframe)
 				end
 			end
 		end
@@ -1320,12 +1128,7 @@ function FakeDataModel.new(config: Config)
 		return instance
 	end
 	function InstanceLib.fromExisting(existing: any): any
-		local copy = newInstance(stateFor(existing).className)
-		for k, v in stateOf[existing].properties do
-			stateOf[copy].properties[k] = v
-		end
-		stateOf[copy].name = stateOf[existing].name
-		return copy
+		return copyInstance(stateFor(existing))
 	end
 
 	-- DataModel and services --------------------------------------------------------------------
@@ -1406,38 +1209,32 @@ function FakeDataModel.new(config: Config)
 	end
 
 	-- HttpService (pure)
-	local httpService = makeService("HttpService")
+	makeService("HttpService")
 	ClassMethods.HttpService = {
 		JSONEncode = RobloxPure.HttpService.JSONEncode :: any,
 		JSONDecode = RobloxPure.HttpService.JSONDecode :: any,
 		GenerateGUID = RobloxPure.HttpService.GenerateGUID :: any,
 		UrlEncode = RobloxPure.HttpService.UrlEncode :: any,
 	}
-	local _ = httpService
 
 	-- CollectionService
-	local collectionService = makeService("CollectionService")
-	collection = {
-		tagged = {} :: { [string]: { any } },
-		added = {} :: { [string]: any },
-		removed = {} :: { [string]: any },
-	}
+	makeService("CollectionService")
+	local tagged: { [string]: { any } } = {} -- tag -> tagged instances in the DataModel
+	local addedSignals: { [string]: any } = {}
+	local removedSignals: { [string]: any } = {}
 	onTagPresence = function(instance: any, tag: string, present: boolean)
-		local list = collection.tagged[tag]
-		if not list then
-			list = {}
-			collection.tagged[tag] = list
-		end
+		local list = tagged[tag] or {}
+		tagged[tag] = list
 		local index = table.find(list, instance)
 		if present and not index then
 			table.insert(list, instance)
-			if collection.added[tag] then
-				fire(collection.added[tag], instance)
+			if addedSignals[tag] then
+				fire(addedSignals[tag], instance)
 			end
 		elseif not present and index then
 			table.remove(list, index)
-			if collection.removed[tag] then
-				fire(collection.removed[tag], instance)
+			if removedSignals[tag] then
+				fire(removedSignals[tag], instance)
 			end
 		end
 	end
@@ -1455,11 +1252,11 @@ function FakeDataModel.new(config: Config)
 			return Methods.GetTags(instance)
 		end,
 		GetTagged = function(_self: any, tag: string)
-			return table.clone(collection.tagged[tag] or {})
+			return table.clone(tagged[tag] or {})
 		end,
 		GetAllTags = function()
 			local tags = {}
-			for tag, list in collection.tagged do
+			for tag, list in tagged do
 				if #list > 0 then
 					table.insert(tags, tag)
 				end
@@ -1468,15 +1265,14 @@ function FakeDataModel.new(config: Config)
 			return tags
 		end,
 		GetInstanceAddedSignal = function(_self: any, tag: string)
-			collection.added[tag] = collection.added[tag] or newSignal("InstanceAdded." .. tag)
-			return collection.added[tag]
+			addedSignals[tag] = addedSignals[tag] or newSignal("InstanceAdded." .. tag)
+			return addedSignals[tag]
 		end,
 		GetInstanceRemovedSignal = function(_self: any, tag: string)
-			collection.removed[tag] = collection.removed[tag] or newSignal("InstanceRemoved." .. tag)
-			return collection.removed[tag]
+			removedSignals[tag] = removedSignals[tag] or newSignal("InstanceRemoved." .. tag)
+			return removedSignals[tag]
 		end,
 	}
-	local _ = collectionService
 
 	for _, name in
 		{
@@ -1537,6 +1333,27 @@ function FakeDataModel.new(config: Config)
 		end
 		return chain
 	end
+	-- { Name, Owner } for each name `declared(owner, add)` adds, over the class chain, each name once.
+	local function memberList(
+		className: string,
+		filter: any?,
+		declared: (owner: string, add: (string) -> ()) -> ()
+	): { any }?
+		local chain = reflectedClassChain(className, filter)
+		if not chain then
+			return nil
+		end
+		local list, seen = {}, {}
+		for _, owner in chain do
+			declared(owner, function(name: string)
+				if not seen[name] then
+					seen[name] = true
+					table.insert(list, { Name = name, Owner = owner })
+				end
+			end)
+		end
+		return list
+	end
 	ClassMethods.ReflectionService = {
 		GetClass = function(_self: any, className: string, _filter: any?): any
 			local info = if type(className) == "string" then classInfo(className) else nil
@@ -1578,66 +1395,28 @@ function FakeDataModel.new(config: Config)
 			return list
 		end,
 		GetEventsOfClass = function(_self: any, className: string, filter: any?): any
-			local chain = reflectedClassChain(className, filter)
-			if not chain then
-				return nil
-			end
-			local list = {}
-			local seen = {}
-			for _, owner in chain do
-				local names = {}
-				for name in (classInfo(owner) :: ClassInfo).events do
-					table.insert(names, name)
-				end
-				local apiClass = api and api[owner]
+			return memberList(className, filter, function(owner: string, add: (string) -> ())
+				local apiClass = api[owner]
 				if apiClass then
 					for name in apiClass.events do
-						table.insert(names, name)
+						add(name)
 					end
 				end
-				for _, name in names do
-					if not seen[name] then
-						seen[name] = true
-						table.insert(list, { Name = name, Owner = owner })
-					end
-				end
-			end
-			return list
+			end)
 		end,
 		GetMethodsOfClass = function(_self: any, className: string, filter: any?): any
-			local chain = reflectedClassChain(className, filter)
-			if not chain then
-				return nil
-			end
-			local list = {}
-			local seen = {}
-			for _, owner in chain do
-				local names = {}
-				local emulated: { [string]: any } = ClassMethods[owner] or {}
+			return memberList(className, filter, function(owner: string, add: (string) -> ())
+				local emulated: { [string]: any } = if owner == "Instance" then Methods else ClassMethods[owner] or {}
 				for name in emulated do
-					table.insert(names, name)
+					add(name)
 				end
-				if owner == "Instance" then
-					for name in Methods do
-						if name ~= "GetSignalFor" then
-							table.insert(names, name)
-						end
-					end
-				end
-				local apiClass = api and api[owner]
+				local apiClass = api[owner]
 				if apiClass then
 					for name in apiClass.methods do
-						table.insert(names, name)
+						add(name)
 					end
 				end
-				for _, name in names do
-					if not seen[name] then
-						seen[name] = true
-						table.insert(list, { Name = name, Owner = owner })
-					end
-				end
-			end
-			return list
+			end)
 		end,
 	}
 	local function childrenOfClass(parent: any, className: string): { any }
@@ -1694,49 +1473,34 @@ function FakeDataModel.new(config: Config)
 		end,
 	}
 	-- A test place has no input devices: no gamepads, no keys down, no focused text box.
+	local function none(): { any }
+		return {}
+	end
+	local function no(): boolean
+		return false
+	end
+	local function zero(): any
+		return D.Vector2.new(0, 0)
+	end
 	ClassMethods.UserInputService = {
-		GetConnectedGamepads = function(): { any }
-			return {}
-		end,
-		GetNavigationGamepads = function(): { any }
-			return {}
-		end,
-		GetGamepadConnected = function(): boolean
-			return false
-		end,
-		GetSupportedGamepadKeyCodes = function(): { any }
-			return {}
-		end,
-		GetKeysPressed = function(): { any }
-			return {}
-		end,
-		GetMouseButtonsPressed = function(): { any }
-			return {}
-		end,
-		IsKeyDown = function(): boolean
-			return false
-		end,
-		IsMouseButtonPressed = function(): boolean
-			return false
-		end,
+		GetConnectedGamepads = none,
+		GetNavigationGamepads = none,
+		GetSupportedGamepadKeyCodes = none,
+		GetKeysPressed = none,
+		GetMouseButtonsPressed = none,
+		GetGamepadConnected = no,
+		IsKeyDown = no,
+		IsMouseButtonPressed = no,
 		GetLastInputType = function(): any
 			return D.Enum.UserInputType.None
 		end,
-		GetMouseLocation = function(): any
-			return D.Vector2.new(0, 0)
-		end,
-		GetMouseDelta = function(): any
-			return D.Vector2.new(0, 0)
-		end,
+		GetMouseLocation = zero,
+		GetMouseDelta = zero,
 		GetFocusedTextBox = function(): any
 			return nil
 		end,
 	}
-	ClassMethods.GuiService = {
-		IsTenFootInterface = function(): boolean
-			return false
-		end,
-	}
+	ClassMethods.GuiService = { IsTenFootInterface = no }
 	ClassMethods.Players = {
 		GetPlayers = function(self: any): { any }
 			return childrenOfClass(self, "Player")
@@ -1754,25 +1518,16 @@ function FakeDataModel.new(config: Config)
 	local frameTime = 0
 	local function step(dt: number)
 		frameTime += dt
-		local rs = stateOf[runService]
+		-- Frame events run their handlers right away, in order, like the engine's task scheduler.
 		local function fireRun(name: string, ...: any)
-			local signal = rs.signals[name]
+			local signal = stateOf[runService].signals[name]
 			if signal then
-				-- Frame events run their handlers right away, in order, like the engine's task scheduler.
-				local signalState = signalStates[signal]
-				for _, connection in table.clone(signalState.connections) do
-					taskLib.spawn(runHandler, connectionStates[connection].fn, ...)
-				end
-				local threads = table.clone(signalState.waiting)
-				table.clear(signalState.waiting)
-				for _, thread in threads do
-					taskLib.spawn(thread, ...)
-				end
+				fireThrough(taskLib.spawn, signal, ...)
 			end
 		end
 		if runConfig.isClient then
 			for _, bound in table.clone(renderSteps) do
-				taskLib.spawn(runHandler, bound.fn, dt)
+				taskLib.spawn(bound.fn, dt)
 			end
 			fireRun("RenderStepped", dt)
 			fireRun("PreRender", dt)
@@ -1788,23 +1543,13 @@ function FakeDataModel.new(config: Config)
 		fireRun("Heartbeat", dt)
 	end
 
-	local dataModel = {
+	return {
 		Instance = table.freeze(InstanceLib),
 		game = game,
 		workspace = workspace,
-		services = services,
+		typeof = typeofValue, -- a typeof that knows the fake objects
 		step = step,
-		runConfig = runConfig,
 	}
-
-	-- typeof that knows the fake objects, for the host to install.
-	dataModel.typeof = typeofValue
-
-	function dataModel.isInstance(value: any): boolean
-		return kinds[value] == KIND_INSTANCE
-	end
-
-	return dataModel
 end
 
 return FakeDataModel

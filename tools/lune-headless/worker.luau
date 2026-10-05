@@ -14,21 +14,14 @@ local process = require("@lune/process")
 local serde = require("@lune/serde")
 
 local Expect = require("./lib/Expect")
+local Fs = require("./lib/Fs")
 local Host = require("./lib/Host")
 local MiniJest = require("./lib/MiniJest")
 local ModuleLoader = require("./lib/ModuleLoader")
 local PackageIndex = require("./lib/PackageIndex")
 local Scheduler = require("./lib/Scheduler")
 
-local args: { [string]: string } = {}
-for _, arg in process.args do
-	local key, value = string.match(arg, "^%-%-([%w%-]+)=(.*)$")
-	if key and value then
-		args[key] = value
-	elseif string.match(arg, "^%-%-[%w%-]+$") then
-		args[string.sub(arg, 3)] = "true"
-	end
-end
+local args = Fs.parseArgs(process.args)
 
 local root = assert(args.root, "--root is required")
 local specPath = assert(args.spec, "--spec is required")
@@ -60,9 +53,6 @@ local globals = Host.build({
 	scheduler = scheduler,
 	log = function(kind: string, message: string)
 		jest:log(kind, message)
-	end,
-	onStrayError = function(message: string)
-		jest:strayError(message)
 	end,
 	datamodel = {
 		isClient = args.realm == "client",

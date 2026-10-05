@@ -291,7 +291,7 @@ The owner answered the M4 questions (`QUESTIONS.md`, "Owner's answers"). What ch
 
 ### Simplification pass
 
-Asked afterwards to simplify and unify concepts, I reworked the Statuh prototype and the jecs findings. Behavior is unchanged except for one generalization, noted below.
+Asked afterwards to simplify and unify concepts, I reworked the Statuh prototype, the jecs findings and the headless runner. Behavior is unchanged except for one Statuh generalization and one runner requirement, both noted below.
 
 - **One principal model in the Statuh core.** Rooms, owners, `Net.Public`, the `VisibleTo` override, scope rules and per-component visibility were six mechanisms with their own indexes. They're one now:
   - a viewer holds principals (everyone, its player entity, its rooms, and per rule its keys);
@@ -305,7 +305,15 @@ Asked afterwards to simplify and unify concepts, I reworked the Statuh prototype
 - **Two untested features got tests:** prediction pins with ROLLBACK, and default-public archetypes.
 - **jecs findings:** each bug is one scenario in `JecsBugs.luau`, run plain and through the workarounds. One spec and one `check.luau` replace six scripts, a spec and a search tool.
 
-Size: Statuh `src/` and `test/` went from 3,920 to 2,780 lines (the core from 1,795 to ~1,160), and jecs-findings from 966 lines in 13 files to 670 in 5. All 22 Statuh tests and 14 jecs tests pass, and the 6,000-seed soak has 0 failures. Mutating the core four ways (REM for HIDE, no re-evaluation when a viewer gains a principal, no reference fix-up, inheritance cut at the parent) fails the tests. The bench is 5–35% slower per frame than the first core, depending on the case; runs vary 10–15%, so part of that is noise. DESIGN.md is rewritten around the principal model.
+- **The runner (`tools/lune-headless`):**
+  - One `lib/Fs.luau` holds the file, path and argument helpers that five files each had a copy of.
+  - The scheduler has one timer type for fake timers and frame-aligned waits, where it had two queues and four near-identical functions.
+  - Each fake instance has one signal table, where it had three.
+  - Signal handlers run through the scheduler's own error guard, so the separate stray-error path through the host is gone.
+  - Module resolution is one breadth-first search with a last-resort global pass, where it had five stages.
+  - Event names come only from luau-lsp's definitions. The hand-written fallback list couldn't pass the datamodel gate anyway (19 must-pass specs fail without the file), so the datamodel level now requires the file and says so (QUESTIONS.md, M5).
+
+Size: Statuh `src/` and `test/` went from 3,920 to 2,780 lines (the core from 1,795 to ~1,160), jecs-findings from 966 lines in 13 files to 670 in 5, and the runner from 6,751 to 6,275 lines. Every runner gate gives the same result spec by spec, down to the names of failing tests: closure (21 must-pass), selftest (19 outcomes), and `--all` at the basic (89 specs pass), roblox (126) and datamodel (283, gate OK) levels. The portability report is unchanged. All 22 Statuh tests and 14 jecs tests pass, and the 6,000-seed soak has 0 failures. Mutating the core four ways (REM for HIDE, no re-evaluation when a viewer gains a principal, no reference fix-up, inheritance cut at the parent) fails the tests. The bench is 5–35% slower per frame than the first core, depending on the case; runs vary 10–15%, so part of that is noise. DESIGN.md is rewritten around the principal model.
 
 ## M5. Fake DataModel with events: `--level=datamodel`
 

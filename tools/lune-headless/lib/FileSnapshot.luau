@@ -13,6 +13,7 @@
 
 local fs = require("@lune/fs")
 
+local Fs = require("./Fs")
 local PackageIndex = require("./PackageIndex")
 
 local FileSnapshot = {}
@@ -26,16 +27,6 @@ export type Snapshot = {
 	readDir: (self: Snapshot, path: string) -> { string },
 	readFile: (self: Snapshot, path: string) -> string,
 }
-
-local function fsIsDir(path: string): boolean
-	local ok, result = pcall(fs.isDir, path)
-	return ok and result
-end
-
-local function fsIsFile(path: string): boolean
-	local ok, result = pcall(fs.isFile, path)
-	return ok and result
-end
 
 -- jest-lua is replaced by MiniJest, so its large tree is never needed.
 local SKIP_PACKAGES = {
@@ -64,7 +55,7 @@ function Snapshot.isFile(self: Snapshot, path: string): boolean
 	elseif self.dirs[path] or listedInParent(self, path) == false then
 		return false
 	end
-	return fsIsFile(path)
+	return Fs.isFile(path)
 end
 
 function Snapshot.isDir(self: Snapshot, path: string): boolean
@@ -73,20 +64,12 @@ function Snapshot.isDir(self: Snapshot, path: string): boolean
 	elseif self.files[path] or listedInParent(self, path) == false then
 		return false
 	end
-	return fsIsDir(path)
+	return Fs.isDir(path)
 end
 
+-- Like Fs.listDir: sorted, without node_modules and dot entries.
 function Snapshot.readDir(self: Snapshot, path: string): { string }
-	local listed = self.dirs[path]
-	if listed then
-		return listed
-	end
-	local ok, entries = pcall(fs.readDir, path)
-	if not ok then
-		return {}
-	end
-	table.sort(entries)
-	return entries
+	return self.dirs[path] or Fs.listDir(path)
 end
 
 function Snapshot.readFile(self: Snapshot, path: string): string
@@ -106,30 +89,18 @@ function FileSnapshot.build(index: PackageIndex.Index, specPackageId: string): S
 		sources = {},
 	}, Snapshot) :: any
 
-	local function walk(dir: string, readSources: boolean)
+	local function walk(dir: string)
 		if self.dirs[dir] then
 			return
 		end
-		local ok, entries = pcall(fs.readDir, dir)
-		if not ok then
-			return
-		end
-		table.sort(entries)
-		local kept = {}
-		for _, entry in entries do
-			if entry == "node_modules" or string.sub(entry, 1, 1) == "." then
-				continue
-			end
-			table.insert(kept, entry)
-		end
-		self.dirs[dir] = kept
-		for _, entry in kept do
+		self.dirs[dir] = Fs.listDir(dir)
+		for _, entry in self.dirs[dir] do
 			local path = dir .. "/" .. entry
-			if fsIsDir(path) then
-				walk(path, readSources)
+			if Fs.isDir(path) then
+				walk(path)
 			else
 				self.files[path] = true
-				if readSources and string.match(entry, "%.luau?$") then
+				if string.match(entry, "%.luau?$") then
 					self.sources[path] = fs.readFile(path)
 				end
 			end
@@ -137,12 +108,7 @@ function FileSnapshot.build(index: PackageIndex.Index, specPackageId: string): S
 	end
 
 	-- The src/ listing lets `script.Parent` chains climb to the package directory and stop there.
-	local srcDir = index.root .. "/src"
-	local ok, srcEntries = pcall(fs.readDir, srcDir)
-	if ok then
-		table.sort(srcEntries)
-		self.dirs[srcDir] = srcEntries
-	end
+	self.dirs[index.root .. "/src"] = Fs.listDir(index.root .. "/src")
 
 	local walked: { [string]: boolean } = {}
 	local function walkPackage(id: string)
@@ -151,7 +117,7 @@ function FileSnapshot.build(index: PackageIndex.Index, specPackageId: string): S
 			return
 		end
 		walked[id] = true
-		walk(pkg.dir, true)
+		walk(pkg.dir)
 	end
 	for _, id in PackageIndex.closure(index, specPackageId) do
 		walkPackage(id)

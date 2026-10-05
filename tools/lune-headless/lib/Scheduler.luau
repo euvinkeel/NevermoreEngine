@@ -15,7 +15,7 @@
 	  error in a callback is still rethrown from advanceTimersByTime, as jest-lua does.
 
 	Frame mode (useFrames, for the datamodel host level): real task.wait/task.delay (and the legacy
-	wait/delay) resume on frames like on Roblox, when the host calls resumeFrameWaiters after a
+	wait/delay) resume on frames like on Roblox, when the host calls resumeFrameTimers after a
 	step, instead of on Lune's own timer. task.wait() then waits for the next frame.
 ]]
 
@@ -25,21 +25,13 @@ local realTask = require("@lune/task")
 local Scheduler = {}
 Scheduler.__index = Scheduler
 
+-- A thread waiting on the fake clock (fake timers, in milliseconds) or for a frame (frame mode, in
+-- os.clock() seconds).
 type Timer = {
-	dueMs: number,
-	seq: number,
+	due: number,
+	start: number,
 	thread: thread,
-	args: { any },
-	resumeValue: boolean, -- true for task.wait: resume with the elapsed time
-	startMs: number,
-}
-
-type FrameWaiter = {
-	dueClock: number,
-	thread: thread,
-	args: { any },
-	resumeValue: boolean,
-	startClock: number,
+	args: { n: number, [number]: any }?, -- a delay's arguments; nil for a wait, which gets the elapsed time
 }
 
 export type Scheduler = typeof(setmetatable(
@@ -47,9 +39,9 @@ export type Scheduler = typeof(setmetatable(
 		fake: boolean,
 		nowMs: number,
 		systemTimeAtZero: number,
-		timers: { Timer },
-		frameWaiters: { FrameWaiter }?,
-		seq: number,
+		timers: { Timer }, -- fake timers, in due order
+		frames: boolean,
+		frameTimers: { Timer },
 		startClock: number,
 		onStrayError: (message: string) -> (),
 		task: any,
@@ -73,14 +65,27 @@ local function traceback(err: any): string
 	return debug.traceback(tostring(err), 2)
 end
 
+local function threadOf(fnOrThread: any): thread
+	return if type(fnOrThread) == "thread" then fnOrThread else coroutine.create(fnOrThread)
+end
+
+-- Resumes a timer's thread: a delay with its arguments, a wait with the elapsed seconds.
+local function resume(timer: Timer, elapsedSeconds: number): (boolean, any)
+	local args = timer.args
+	if args then
+		return coroutine.resume(timer.thread, table.unpack(args, 1, args.n))
+	end
+	return coroutine.resume(timer.thread, elapsedSeconds)
+end
+
 function Scheduler.new(onStrayError: (message: string) -> ()): Scheduler
 	local self = setmetatable({
 		fake = false,
 		nowMs = 0,
 		systemTimeAtZero = realUnixSeconds(),
 		timers = {},
-		frameWaiters = nil,
-		seq = 0,
+		frames = false,
+		frameTimers = {},
 		startClock = os.clock(),
 		onStrayError = onStrayError,
 		task = nil :: any,
@@ -94,8 +99,8 @@ function Scheduler.new(onStrayError: (message: string) -> ()): Scheduler
 	return self
 end
 
--- Runs fn and reports an error instead of letting it escape the thread.
-function Scheduler._guard(self: Scheduler, fn: (...any) -> ...any): (...any) -> ()
+-- `fn`, reporting its error as a stray error instead of letting it escape the thread.
+function Scheduler.guard(self: Scheduler, fn: (...any) -> ...any): (...any) -> ()
 	return function(...)
 		local ok, err = xpcall(fn, traceback, ...)
 		if not ok then
@@ -104,164 +109,77 @@ function Scheduler._guard(self: Scheduler, fn: (...any) -> ...any): (...any) -> 
 	end
 end
 
-function Scheduler._insertTimer(self: Scheduler, timer: Timer)
-	local insertAt = #self.timers + 1
-	for i, other in self.timers do
-		if other.dueMs > timer.dueMs then
-			insertAt = i
-			break
-		end
-	end
-	table.insert(self.timers, insertAt, timer)
+-- A thread as is, or a function guarded.
+function Scheduler._callable(self: Scheduler, fnOrThread: any): any
+	return if type(fnOrThread) == "thread" then fnOrThread else self:guard(fnOrThread)
 end
 
-function Scheduler._fakeDelay(self: Scheduler, seconds: number?, fnOrThread: any, ...: any): thread
-	local thread = if type(fnOrThread) == "thread" then fnOrThread else coroutine.create(fnOrThread)
-	self.seq += 1
-	self:_insertTimer({
-		dueMs = self.nowMs + math.max(seconds or 0, 0) * 1000,
-		seq = self.seq,
-		thread = thread,
-		args = table.pack(...),
-		resumeValue = false,
-		startMs = self.nowMs,
-	})
-	return thread
-end
-
-function Scheduler._fakeWait(self: Scheduler, seconds: number?): number
-	local thread = coroutine.running()
-	self.seq += 1
-	self:_insertTimer({
-		dueMs = self.nowMs + math.max(seconds or 0, 0) * 1000,
-		seq = self.seq,
-		thread = thread,
-		args = {},
-		resumeValue = true,
-		startMs = self.nowMs,
-	})
-	return coroutine.yield()
-end
-
--- Removes the timer for `thread`. Returns true if one was pending.
-function Scheduler._cancelFake(self: Scheduler, thread: any): boolean
-	for i, timer in self.timers do
-		if timer.thread == thread then
-			table.remove(self.timers, i)
-			return true
-		end
-	end
-	return false
-end
-
-function Scheduler._frameWait(self: Scheduler, waiters: { FrameWaiter }, seconds: number?): number
-	local now = os.clock()
-	table.insert(waiters, {
-		dueClock = now + math.max(seconds or 0, 0),
-		thread = coroutine.running(),
-		args = {},
-		resumeValue = true,
-		startClock = now,
-	})
-	return coroutine.yield()
-end
-
-function Scheduler._frameDelay(
+-- Queues `thread` to resume `seconds` from now, on the fake clock or on frames.
+function Scheduler._queue(
 	self: Scheduler,
-	waiters: { FrameWaiter },
+	onFakeClock: boolean,
 	seconds: number?,
-	fnOrThread: any,
-	...: any
+	thread: thread,
+	args: { n: number, [number]: any }?
 ): thread
-	local thread = if type(fnOrThread) == "thread" then fnOrThread else coroutine.create(self:_guard(fnOrThread))
-	local now = os.clock()
-	table.insert(waiters, {
-		dueClock = now + math.max(seconds or 0, 0),
-		thread = thread,
-		args = table.pack(...) :: any,
-		resumeValue = false,
-		startClock = now,
-	})
-	return thread
-end
-
-function Scheduler._cancelFrame(self: Scheduler, thread: any): boolean
-	local waiters = self.frameWaiters
-	if not waiters then
-		return false
-	end
-	for i, waiter in waiters do
-		if waiter.thread == thread then
-			table.remove(waiters, i)
-			return true
+	local delay = math.max(seconds or 0, 0)
+	if onFakeClock then
+		local timer = { due = self.nowMs + delay * 1000, start = self.nowMs, thread = thread, args = args }
+		local at = #self.timers + 1
+		for i, other in self.timers do
+			if other.due > timer.due then
+				at = i
+				break
+			end
 		end
+		table.insert(self.timers, at, timer)
+	else
+		local now = os.clock()
+		table.insert(self.frameTimers, { due = now + delay, start = now, thread = thread, args = args })
 	end
-	return false
+	return thread
 end
 
 -- A delay that jest fake timers don't touch, for engine-driven timing (Debris, WaitForChild
 -- timeouts): frame-aligned in frame mode, Lune's timer otherwise.
 function Scheduler.engineDelay(self: Scheduler, seconds: number, fn: () -> ())
-	if self.frameWaiters then
-		self:_frameDelay(self.frameWaiters, seconds, fn)
+	if self.frames then
+		self:_queue(false, seconds, coroutine.create(self:guard(fn)), table.pack())
 	else
-		realTask.delay(seconds, self:_guard(fn))
+		realTask.delay(seconds, self:guard(fn))
 	end
 end
 
--- Real waits and delays resume on frames from now on (see resumeFrameWaiters).
+-- Real waits and delays resume on frames from now on (see resumeFrameTimers).
 function Scheduler.useFrames(self: Scheduler)
-	self.frameWaiters = self.frameWaiters or {}
+	self.frames = true
 end
 
--- Resumes every frame-aligned wait and delay that is due. Ones queued while this runs wait for
--- the next frame.
-function Scheduler.resumeFrameWaiters(self: Scheduler)
-	local waiters = self.frameWaiters
-	if not waiters or #waiters == 0 then
-		return
-	end
+-- Resumes every frame timer that is due. Ones queued while this runs wait for the next frame.
+function Scheduler.resumeFrameTimers(self: Scheduler)
 	local now = os.clock()
-	local due = {}
-	local index = 1
-	while index <= #waiters do
-		local waiter = waiters[index]
-		if waiter.dueClock <= now then
-			table.insert(due, waiter)
-			table.remove(waiters, index)
-		else
-			index += 1
-		end
+	local due: { Timer }, waiting: { Timer } = {}, {}
+	for _, timer in self.frameTimers do
+		table.insert(if timer.due <= now then due else waiting, timer)
 	end
-	for _, waiter in due do
-		if coroutine.status(waiter.thread) == "suspended" then
-			local ok, err
-			if waiter.resumeValue then
-				ok, err = coroutine.resume(waiter.thread, now - waiter.startClock)
-			else
-				ok, err = coroutine.resume(waiter.thread, table.unpack(waiter.args, 1, (waiter.args :: any).n))
-			end
+	self.frameTimers = waiting
+	for _, timer in due do
+		if coroutine.status(timer.thread) == "suspended" then
+			local ok, err = resume(timer, now - timer.start)
 			if not ok then
-				self.onStrayError(debug.traceback(waiter.thread, tostring(err)))
+				self.onStrayError(debug.traceback(timer.thread, tostring(err)))
 			end
 		end
 	end
 end
 
 function Scheduler._fire(self: Scheduler, timer: Timer)
-	self.nowMs = math.max(self.nowMs, timer.dueMs)
-	local status = coroutine.status(timer.thread)
-	if status ~= "suspended" then
-		return
-	end
-	local ok, err
-	if timer.resumeValue then
-		ok, err = coroutine.resume(timer.thread, (self.nowMs - timer.startMs) / 1000)
-	else
-		ok, err = coroutine.resume(timer.thread, table.unpack(timer.args, 1, (timer.args :: any).n))
-	end
-	if not ok then
-		error(err, 0)
+	self.nowMs = math.max(self.nowMs, timer.due)
+	if coroutine.status(timer.thread) == "suspended" then
+		local ok, err = resume(timer, (self.nowMs - timer.start) / 1000)
+		if not ok then
+			error(err, 0)
+		end
 	end
 end
 
@@ -269,42 +187,36 @@ function Scheduler._buildTask(self: Scheduler): any
 	local scheduler = self
 	return {
 		spawn = function(fnOrThread: any, ...: any): thread
-			if type(fnOrThread) == "thread" then
-				return realTask.spawn(fnOrThread, ...)
-			end
-			return realTask.spawn(scheduler:_guard(fnOrThread), ...)
+			return realTask.spawn(scheduler:_callable(fnOrThread), ...)
 		end,
 		defer = function(fnOrThread: any, ...: any): thread
-			if type(fnOrThread) == "thread" then
-				return realTask.defer(fnOrThread, ...)
-			end
-			return realTask.defer(scheduler:_guard(fnOrThread), ...)
+			return realTask.defer(scheduler:_callable(fnOrThread), ...)
 		end,
 		delay = function(seconds: number?, fnOrThread: any, ...: any): thread
 			if scheduler.fake then
-				return scheduler:_fakeDelay(seconds, fnOrThread, ...)
+				-- Not guarded: advanceTimersByTime rethrows a callback's error, as jest-lua does.
+				return scheduler:_queue(true, seconds, threadOf(fnOrThread), table.pack(...))
+			elseif scheduler.frames then
+				return scheduler:_queue(false, seconds, threadOf(scheduler:_callable(fnOrThread)), table.pack(...))
 			end
-			if scheduler.frameWaiters then
-				return scheduler:_frameDelay(scheduler.frameWaiters, seconds, fnOrThread, ...)
-			end
-			if type(fnOrThread) == "thread" then
-				return realTask.delay(seconds or 0, fnOrThread, ...)
-			end
-			return realTask.delay(seconds or 0, scheduler:_guard(fnOrThread), ...)
+			return realTask.delay(seconds or 0, scheduler:_callable(fnOrThread), ...)
 		end,
 		wait = function(seconds: number?): number
-			if scheduler.fake then
-				return scheduler:_fakeWait(seconds)
-			end
-			if scheduler.frameWaiters then
-				return scheduler:_frameWait(scheduler.frameWaiters, seconds)
+			if scheduler.fake or scheduler.frames then
+				scheduler:_queue(scheduler.fake, seconds, coroutine.running(), nil)
+				return coroutine.yield()
 			end
 			return realTask.wait(seconds)
 		end,
 		cancel = function(thread: any)
-			if scheduler:_cancelFake(thread) or scheduler:_cancelFrame(thread) then
-				pcall(coroutine.close, thread)
-				return
+			for _, timers in { scheduler.timers, scheduler.frameTimers } do
+				for i, timer in timers do
+					if timer.thread == thread then
+						table.remove(timers, i)
+						pcall(coroutine.close, thread)
+						return
+					end
+				end
 			end
 			if type(thread) == "thread" then
 				realTask.cancel(thread)
@@ -315,10 +227,6 @@ function Scheduler._buildTask(self: Scheduler): any
 	}
 end
 
-function Scheduler.clock(self: Scheduler): number
-	return if self.fake then self.nowMs / 1000 else os.clock()
-end
-
 function Scheduler.unixTime(self: Scheduler): number
 	return if self.fake then self.systemTimeAtZero + self.nowMs / 1000 else realUnixSeconds()
 end
@@ -327,7 +235,7 @@ function Scheduler._buildOs(self: Scheduler): any
 	local scheduler = self
 	return setmetatable({
 		clock = function(): number
-			return scheduler:clock()
+			return if scheduler.fake then scheduler.nowMs / 1000 else os.clock()
 		end,
 		time = function(t: any?): number
 			if t ~= nil then
@@ -367,18 +275,14 @@ end
 function Scheduler.useFakeTimers(self: Scheduler)
 	if not self.fake then
 		self.fake = true
-		self:reset()
+		self.nowMs = 0
+		self.systemTimeAtZero = realUnixSeconds()
+		table.clear(self.timers)
 	end
 end
 
 function Scheduler.useRealTimers(self: Scheduler)
 	self.fake = false
-end
-
-function Scheduler.reset(self: Scheduler)
-	self.nowMs = 0
-	self.systemTimeAtZero = realUnixSeconds()
-	table.clear(self.timers)
 end
 
 function Scheduler.clearAllTimers(self: Scheduler)
@@ -397,35 +301,29 @@ function Scheduler.setSystemTime(self: Scheduler, now: any?)
 	self.systemTimeAtZero = seconds - self.nowMs / 1000
 end
 
-function Scheduler.advanceTimersByTime(self: Scheduler, ms: number)
-	if not self.fake then
-		return
-	end
-	local target = self.nowMs + ms
+-- Fires fake timers in due order while the next one is due by `untilMs` (nil: until none are left).
+function Scheduler._runTimers(self: Scheduler, untilMs: number?)
 	local loops = 0
-	while self.timers[1] and self.timers[1].dueMs <= target do
+	while self.timers[1] and (untilMs == nil or self.timers[1].due <= untilMs) do
 		loops += 1
 		if loops > MAX_TIMER_LOOPS then
-			error(`Ran {MAX_TIMER_LOOPS} timers, and there are still more! Assuming an infinite loop.`, 2)
+			error(`Ran {MAX_TIMER_LOOPS} timers, and there are still more! Assuming an infinite loop.`, 3)
 		end
-		local timer = table.remove(self.timers, 1) :: Timer
-		self:_fire(timer)
+		self:_fire(table.remove(self.timers, 1) :: Timer)
 	end
-	self.nowMs = math.max(self.nowMs, target)
+end
+
+function Scheduler.advanceTimersByTime(self: Scheduler, ms: number)
+	if self.fake then
+		local target = self.nowMs + ms
+		self:_runTimers(target)
+		self.nowMs = math.max(self.nowMs, target)
+	end
 end
 
 function Scheduler.runAllTimers(self: Scheduler)
-	if not self.fake then
-		return
-	end
-	local loops = 0
-	while self.timers[1] do
-		loops += 1
-		if loops > MAX_TIMER_LOOPS then
-			error(`Ran {MAX_TIMER_LOOPS} timers, and there are still more! Assuming an infinite loop.`, 2)
-		end
-		local timer = table.remove(self.timers, 1) :: Timer
-		self:_fire(timer)
+	if self.fake then
+		self:_runTimers(nil)
 	end
 end
 
@@ -449,7 +347,7 @@ function Scheduler.advanceTimersToNextTimer(self: Scheduler, steps: number?)
 		if not nextTimer then
 			return
 		end
-		self:advanceTimersByTime(nextTimer.dueMs - self.nowMs)
+		self:advanceTimersByTime(nextTimer.due - self.nowMs)
 	end
 end
 

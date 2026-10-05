@@ -29,6 +29,7 @@ local fs = require("@lune/fs")
 local process = require("@lune/process")
 local serde = require("@lune/serde")
 
+local Fs = require("./lib/Fs")
 local PackageIndex = require("./lib/PackageIndex")
 local RobloxApi = require("./lib/RobloxApi")
 
@@ -66,15 +67,7 @@ local POLYFILLED_DEBUG = {
 	dumpcodesize = true,
 }
 
-local options: { [string]: string } = {}
-for _, arg in process.args do
-	local key, value = string.match(arg, "^%-%-([%w%-]+)=(.*)$")
-	if key and value then
-		options[key] = value
-	elseif string.match(arg, "^%-%-[%w%-]+$") then
-		options[string.sub(arg, 3)] = "true"
-	end
-end
+local options = Fs.parseArgs(process.args)
 
 local root = string.gsub(options.root or process.cwd, "[/\\]+$", "")
 local TOOL_DIR = root .. "/tools/lune-headless"
@@ -83,15 +76,7 @@ local BASELINE = TOOL_DIR .. "/portability/baseline.json"
 local lsp = process.env.LUAU_LSP or "luau-lsp"
 
 local function relative(path: string): string
-	if string.sub(path, 1, #root + 1) == root .. "/" then
-		return string.sub(path, #root + 2)
-	end
-	return path
-end
-
-local function isFile(path: string): boolean
-	local ok, result = pcall(fs.isFile, path)
-	return ok and result
+	return Fs.relative(root, path)
 end
 
 local function stripComments(source: string): string
@@ -161,13 +146,13 @@ while #queue > 0 do
 			end
 		end
 	end
-	local dir = string.match(path, "^(.*)/[^/]+$") :: string
+	local dir = Fs.dirname(path)
 	for name in string.gmatch(source, "require%(%s*script%.Parent%.([%w_]+)%s*%)") do
 		if name ~= "loader" then
 			for _, candidate in
 				{ `{dir}/{name}.lua`, `{dir}/{name}.luau`, `{dir}/{name}/init.lua`, `{dir}/{name}/init.luau` }
 			do
-				if isFile(candidate) then
+				if Fs.isFile(candidate) then
 					add(candidate)
 					break
 				end

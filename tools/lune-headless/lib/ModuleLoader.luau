@@ -18,6 +18,7 @@ local luau = require("@lune/luau")
 local task = require("@lune/task")
 
 local FileSnapshot = require("./FileSnapshot")
+local Fs = require("./Fs")
 local PackageIndex = require("./PackageIndex")
 
 local ModuleLoader = {}
@@ -41,13 +42,8 @@ local LOADER_MARKER = setmetatable({}, {
 	end,
 })
 
-local function dirname(path: string): string
-	return string.match(path, "^(.*)/[^/]*$") or path
-end
-
-local function basename(path: string): string
-	return string.match(path, "([^/]*)$") or path
-end
+local dirname = Fs.dirname
+local basename = Fs.basename
 
 local function normalize(path: string): string
 	local parts = {}
@@ -74,30 +70,27 @@ function ModuleLoader.new(options: Options): Loader
 
 	-- Every filesystem question goes through the snapshot, so script-node metamethods never yield.
 	local snapshot = FileSnapshot.build(index, specPackageId)
-	local function isFile(path: string): boolean
-		return snapshot:isFile(path)
-	end
-	local function isDir(path: string): boolean
-		return snapshot:isDir(path)
-	end
 	local function initFileOf(dir: string): string?
 		for _, name in { "init.luau", "init.lua" } do
-			if isFile(dir .. "/" .. name) then
+			if snapshot:isFile(dir .. "/" .. name) then
 				return dir .. "/" .. name
 			end
 		end
 		return nil
 	end
-	local function moduleFileFor(base: string): string?
+	-- What `base` names, as a child is found on Roblox: base.luau, base.lua, or the folder base.
+	local function childPath(base: string): string?
 		for _, candidate in { base .. ".luau", base .. ".lua" } do
-			if isFile(candidate) then
+			if snapshot:isFile(candidate) then
 				return candidate
 			end
 		end
-		if isDir(base) then
-			return initFileOf(base)
-		end
-		return nil
+		return if snapshot:isDir(base) then base else nil
+	end
+	-- The file that runs for `base`: base.luau, base.lua, or the folder's init file.
+	local function moduleFileFor(base: string): string?
+		local path = childPath(base)
+		return if path == base then initFileOf(base) else path
 	end
 
 	local cache: { [string]: { value: any } } = {}
@@ -129,10 +122,7 @@ function ModuleLoader.new(options: Options): Loader
 	end
 
 	local function relative(path: string): string
-		if string.sub(path, 1, #root + 1) == root .. "/" then
-			return string.sub(path, #root + 2)
-		end
-		return path
+		return Fs.relative(root, path)
 	end
 
 	local loadFile: (path: string, isSpec: boolean?) -> any
@@ -145,19 +135,8 @@ function ModuleLoader.new(options: Options): Loader
 
 	function NODE_METHODS.FindFirstChild(self: any, name: string): any
 		local dir = rawget(self, "_childrenDir")
-		if not dir or name == "init" then
-			return nil
-		end
-		local base = dir .. "/" .. name
-		for _, candidate in { base .. ".luau", base .. ".lua" } do
-			if isFile(candidate) then
-				return nodeFor(candidate)
-			end
-		end
-		if isDir(base) then
-			return nodeFor(base)
-		end
-		return nil
+		local path = if dir and name ~= "init" then childPath(dir .. "/" .. name) else nil
+		return if path then nodeFor(path) else nil
 	end
 
 	function NODE_METHODS.WaitForChild(self: any, name: string): any
@@ -175,11 +154,10 @@ function ModuleLoader.new(options: Options): Loader
 			return children
 		end
 		for _, entry in snapshot:readDir(dir) do
-			if entry == "node_modules" or string.sub(entry, 1, 1) == "." then
-				continue
-			end
 			local path = dir .. "/" .. entry
-			if isDir(path) or (string.match(entry, "%.luau?$") and not string.match(entry, "^init%.luau?$")) then
+			if
+				snapshot:isDir(path) or (string.match(entry, "%.luau?$") and not string.match(entry, "^init%.luau?$"))
+			then
 				table.insert(children, nodeFor(path))
 			end
 		end
@@ -251,7 +229,7 @@ function ModuleLoader.new(options: Options): Loader
 			return existing
 		end
 		local node: any
-		if isDir(path) then
+		if snapshot:isDir(path) then
 			local initFile = initFileOf(path)
 			node = setmetatable({
 				Name = basename(path),
@@ -347,7 +325,7 @@ function ModuleLoader.new(options: Options): Loader
 		if not resolution then
 			error(`[lune-headless] Could not find module "{name}" (required from {relative(fromPath)})`, 3)
 		end
-		if resolution.how == "global" then
+		if resolution.global then
 			note(`"{name}" from {fromId} resolved only through the global fallback ({resolution.packageId})`)
 		end
 		return loadFile(resolution.entry.path)

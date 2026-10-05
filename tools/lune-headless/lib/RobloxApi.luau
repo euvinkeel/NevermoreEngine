@@ -9,12 +9,17 @@
 	- a real method the fake doesn't implement reports "not emulated" instead of "not a valid member";
 	- ReflectionService:GetEventsOfClass/GetMethodsOfClass have something to answer with.
 
-	The file is optional: without it, only the events FakeDataModel declares by hand exist.
+	The datamodel level needs the file; the portability lint can do without it.
 ]]
 
 local fs = require("@lune/fs")
 
+local Fs = require("./Fs")
+
 local RobloxApi = {}
+
+RobloxApi.MISSING = "[lune-headless] The datamodel level needs luau-lsp's definitions, globalTypes.d.lua in the "
+	.. "repo root. Run `npm run lint:luau` once to download them."
 
 export type ApiClass = {
 	superclass: string?,
@@ -63,11 +68,7 @@ end
 
 -- The parsed definitions at `path`, or nil if the file isn't there.
 function RobloxApi.load(path: string): Api?
-	local ok, isFile = pcall(fs.isFile, path)
-	if not ok or not isFile then
-		return nil
-	end
-	return RobloxApi.parse(fs.readFile(path))
+	return if Fs.isFile(path) then RobloxApi.parse(fs.readFile(path)) else nil
 end
 
 return RobloxApi

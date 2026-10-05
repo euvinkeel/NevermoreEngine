@@ -31,7 +31,7 @@ export type DataModelOptions = {
 	isRunning: boolean?,
 	isStudio: boolean?,
 	signalMode: FakeDataModel.SignalMode?,
-	-- luau-lsp definitions (globalTypes.d.lua) for event and method names; optional.
+	-- luau-lsp definitions (globalTypes.d.lua), for event, method and property names.
 	apiPath: string?,
 }
 
@@ -39,7 +39,6 @@ export type Options = {
 	level: Level,
 	scheduler: Scheduler.Scheduler,
 	log: (kind: string, message: string) -> (),
-	onStrayError: (message: string) -> (),
 	datamodel: DataModelOptions?,
 }
 
@@ -228,6 +227,10 @@ function Host.build(options: Options): { [string]: any }
 		})
 	elseif level == "datamodel" then
 		local dmOptions: DataModelOptions = options.datamodel or {}
+		local api = if dmOptions.apiPath then RobloxApi.load(dmOptions.apiPath) else nil
+		if not api then
+			error(RobloxApi.MISSING, 0)
+		end
 		local isClient = dmOptions.isClient == true
 		local roblox = require("@lune/roblox") :: any
 		local datatypes = installDatatypes(globals)
@@ -257,8 +260,7 @@ function Host.build(options: Options): { [string]: any }
 			datatypes = datatypes,
 			enumShim = enumShim,
 			reflection = roblox.getReflectionDatabase(),
-			api = if dmOptions.apiPath then RobloxApi.load(dmOptions.apiPath) else nil,
-			onStrayError = options.onStrayError,
+			api = api,
 		})
 		globals.Instance = dm.Instance
 		globals.game = dm.game
@@ -276,7 +278,7 @@ function Host.build(options: Options): { [string]: any }
 				local now = os.clock()
 				dm.step(now - lastClock)
 				lastClock = now
-				scheduler:resumeFrameWaiters()
+				scheduler:resumeFrameTimers()
 			end
 		end)
 	end

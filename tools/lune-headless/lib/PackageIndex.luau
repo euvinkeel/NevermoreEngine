@@ -6,15 +6,16 @@
 	1. modules in the requiring package itself,
 	2. modules in the package's direct dependencies (its node_modules),
 	3. "implicit parent" packages. On Roblox these are the packages above it in the nested
-	   node_modules tree. Headlessly we approximate that with a breadth-first walk of the
-	   transitive dependencies, then the spec's own package closure, then a global fallback
-	   (which is recorded, since Roblox might not find the module).
+	   node_modules tree. Headlessly that's approximated by the rest of a breadth-first walk of
+	   its dependencies, then the spec's own package closure, then a global fallback (which is
+	   recorded, since Roblox might not find the module).
 
 	The index is plain data so the orchestrator can build it once and hand it to every worker.
 ]]
 
-local fs = require("@lune/fs")
 local serde = require("@lune/serde")
+
+local Fs = require("./Fs")
 
 local PackageIndex = {}
 
@@ -41,34 +42,6 @@ export type Index = {
 	duplicates: { string }, -- "pkg: Name (a, b)" notes for modules defined twice in one package
 }
 
--- fs.isDir/isFile throw ("Not a directory") when a path component is a file, so guard them.
-local function isDir(path: string): boolean
-	local ok, result = pcall(fs.isDir, path)
-	return ok and result
-end
-
-local function isFile(path: string): boolean
-	local ok, result = pcall(fs.isFile, path)
-	return ok and result
-end
-
-local function readJson(path: string): any?
-	if not isFile(path) then
-		return nil
-	end
-	local ok, decoded = pcall(serde.decode, "json" :: any, fs.readFile(path))
-	return if ok then decoded else nil
-end
-
-local function readDir(path: string): { string }
-	local ok, result = pcall(fs.readDir, path)
-	if not ok then
-		return {}
-	end
-	table.sort(result)
-	return result
-end
-
 -- Rojo turns `Foo.lua` and `Foo/init.lua` into a ModuleScript named Foo. Names with another dot
 -- (Foo.spec, Foo.story, Foo.server, Foo.client, GlobalPackageTracker.global) are not loader modules.
 local function moduleNameOf(entry: string): string?
@@ -77,6 +50,16 @@ local function moduleNameOf(entry: string): string?
 		return nil
 	end
 	return name
+end
+
+-- The first of `names` that is a file in `dir`.
+local function firstFile(dir: string, names: { string }): string?
+	for _, name in names do
+		if Fs.isFile(dir .. "/" .. name) then
+			return dir .. "/" .. name
+		end
+	end
+	return nil
 end
 
 local REALM_FOLDERS = { Server = "server", Client = "client", Shared = "shared" }
@@ -88,20 +71,11 @@ local function scanModules(
 	duplicates: { string },
 	pkgName: string
 )
-	for _, entry in readDir(dir) do
-		if entry == "node_modules" or string.sub(entry, 1, 1) == "." then
-			continue
-		end
+	for _, entry in Fs.listDir(dir) do
 		local path = dir .. "/" .. entry
-		if isDir(path) then
+		if Fs.isDir(path) then
 			local childRealm = REALM_FOLDERS[entry] or realm
-			local initPath = nil
-			for _, initName in { "init.luau", "init.lua" } do
-				if isFile(path .. "/" .. initName) then
-					initPath = path .. "/" .. initName
-					break
-				end
-			end
+			local initPath = firstFile(path, { "init.luau", "init.lua" })
 			if initPath then
 				local existing = modules[entry]
 				if existing then
@@ -138,22 +112,6 @@ local function resolveTreePath(pkgDir: string, project: any): string?
 	return pkgDir .. "/" .. treePath
 end
 
--- The entry file for a package whose tree.$path is a file or a folder with init.
-local function entryFileOf(treePath: string, projectName: string?): string?
-	if isFile(treePath) then
-		return treePath
-	end
-	if not isDir(treePath) then
-		return nil
-	end
-	for _, candidate in { "init.luau", "init.lua", (projectName or "") .. ".luau", (projectName or "") .. ".lua" } do
-		if isFile(treePath .. "/" .. candidate) then
-			return treePath .. "/" .. candidate
-		end
-	end
-	return nil
-end
-
 local function dependencyNames(packageJson: any): { string }
 	local names = {}
 	for _, field in { "dependencies", "devDependencies" } do
@@ -184,13 +142,13 @@ function PackageIndex.build(root: string): Index
 
 	-- Pass 1: workspace packages under src/.
 	local pending: { { pkg: Package, json: any } } = {}
-	for _, entry in readDir(root .. "/src") do
+	for _, entry in Fs.listDir(root .. "/src") do
 		local dir = root .. "/src/" .. entry
-		local packageJson = readJson(dir .. "/package.json")
+		local packageJson = Fs.readJson(dir .. "/package.json")
 		if not packageJson or type(packageJson.name) ~= "string" then
 			continue
 		end
-		local project = readJson(dir .. "/default.project.json")
+		local project = Fs.readJson(dir .. "/default.project.json")
 		local treePath = resolveTreePath(dir, project) or (dir .. "/src")
 		local pkg: Package = {
 			id = "src/" .. entry,
@@ -202,7 +160,7 @@ function PackageIndex.build(root: string): Index
 			modules = {},
 			dependencies = {},
 		}
-		if isDir(treePath) then
+		if Fs.isDir(treePath) then
 			scanModules(treePath, "shared", pkg.modules, index.duplicates, pkg.name)
 		end
 		index.packages[pkg.id] = pkg
@@ -213,8 +171,8 @@ function PackageIndex.build(root: string): Index
 	-- Pass 2: dependencies. Workspace deps resolve by name; others are read through node_modules.
 	local function addThirdParty(depName: string, depDir: string): string?
 		-- Git dependencies without a package.json (e.g. BufferEncoder.git) still have a Rojo project.
-		local depJson = readJson(depDir .. "/package.json")
-			or (if isFile(depDir .. "/default.project.json") then { name = depName } else nil)
+		local depJson = Fs.readJson(depDir .. "/package.json")
+			or (if Fs.isFile(depDir .. "/default.project.json") then { name = depName } else nil)
 		if not depJson or type(depJson.name) ~= "string" then
 			return nil
 		end
@@ -222,7 +180,7 @@ function PackageIndex.build(root: string): Index
 		if index.packages[id] then
 			return id
 		end
-		local project = readJson(depDir .. "/default.project.json")
+		local project = Fs.readJson(depDir .. "/default.project.json")
 		local projectName = if type(project) == "table" and type(project.name) == "string" then project.name else nil
 		local pkg: Package = {
 			id = id,
@@ -234,10 +192,19 @@ function PackageIndex.build(root: string): Index
 			modules = {},
 			dependencies = {},
 		}
-		-- A third-party package is one module, named like its Rojo project, at its tree root.
-		local entryFile = pkg.treePath and entryFileOf(pkg.treePath, projectName)
-		if entryFile and projectName then
-			pkg.modules[projectName] = { path = entryFile, realm = "shared" }
+		-- A third-party package is one module, named like its Rojo project: its tree.$path file, or
+		-- that folder's init file or file named like the project.
+		local treePath = pkg.treePath
+		if treePath and projectName then
+			local entryFile = if Fs.isFile(treePath)
+				then treePath
+				else firstFile(
+					treePath,
+					{ "init.luau", "init.lua", projectName .. ".luau", projectName .. ".lua" }
+				)
+			if entryFile then
+				pkg.modules[projectName] = { path = entryFile, realm = "shared" }
+			end
 		end
 		index.packages[id] = pkg
 		return id
@@ -250,7 +217,7 @@ function PackageIndex.build(root: string): Index
 				table.insert(item.pkg.dependencies, workspaceId)
 			else
 				local depDir = item.pkg.dir .. "/node_modules/" .. depName
-				if isDir(depDir) then
+				if Fs.isDir(depDir) then
 					local id = addThirdParty(depName, depDir)
 					if id then
 						table.insert(item.pkg.dependencies, id)
@@ -291,22 +258,17 @@ function PackageIndex.closure(index: Index, startId: string): { string }
 	return order
 end
 
-local function findIn(index: Index, pkgId: string, name: string): ModuleEntry?
+-- The module `name` in a package. A third-party package's one module also matches ignoring case:
+-- BufferEncoder's Rojo project is named "bufferencoder", and code requires it either way.
+local function find(index: Index, pkgId: string, name: string): ModuleEntry?
 	local pkg = index.packages[pkgId]
 	if not pkg then
 		return nil
+	elseif pkg.modules[name] or pkg.isWorkspace then
+		return pkg.modules[name]
 	end
-	return pkg.modules[name]
-end
-
-local function findCaseInsensitive(index: Index, pkgId: string, name: string): ModuleEntry?
-	local pkg = index.packages[pkgId]
-	if not pkg or pkg.isWorkspace then
-		return nil
-	end
-	local lower = string.lower(name)
 	for moduleName, entry in pkg.modules do
-		if string.lower(moduleName) == lower then
+		if string.lower(moduleName) == string.lower(name) then
 			return entry
 		end
 	end
@@ -316,53 +278,33 @@ end
 export type Resolution = {
 	entry: ModuleEntry,
 	packageId: string,
-	how: string, -- "own" | "direct" | "transitive" | "spec" | "global"
+	global: boolean, -- found only by the last-resort search of every package
 }
 
--- Resolve a bare module name requested from inside `fromId`, for a spec living in `specId`.
+-- Resolve a bare module name requested from inside `fromId`, for a spec living in `specId`: the
+-- requiring package and its dependencies breadth first (own modules, then direct dependencies,
+-- then transitive ones), then the spec's package closure, then every package.
 function PackageIndex.resolve(index: Index, fromId: string, specId: string, name: string): Resolution?
-	local own = findIn(index, fromId, name)
-	if own then
-		return { entry = own, packageId = fromId, how = "own" }
-	end
-
-	local fromPkg = index.packages[fromId]
-	if fromPkg then
-		for _, dep in fromPkg.dependencies do
-			local found = findIn(index, dep, name) or findCaseInsensitive(index, dep, name)
+	local function search(ids: { string }, global: boolean): Resolution?
+		for _, id in ids do
+			local found = find(index, id, name)
 			if found then
-				return { entry = found, packageId = dep, how = "direct" }
+				return { entry = found, packageId = id, global = global }
 			end
 		end
+		return nil
 	end
-
-	for _, dep in PackageIndex.closure(index, fromId) do
-		local found = findIn(index, dep, name) or findCaseInsensitive(index, dep, name)
-		if found then
-			return { entry = found, packageId = dep, how = "transitive" }
-		end
+	local resolution = search(PackageIndex.closure(index, fromId), false)
+		or search(PackageIndex.closure(index, specId), false)
+	if resolution then
+		return resolution
 	end
-
-	for _, dep in PackageIndex.closure(index, specId) do
-		local found = findIn(index, dep, name) or findCaseInsensitive(index, dep, name)
-		if found then
-			return { entry = found, packageId = dep, how = "spec" }
-		end
-	end
-
 	local ids = {}
 	for id in index.packages do
 		table.insert(ids, id)
 	end
 	table.sort(ids)
-	for _, id in ids do
-		local found = findIn(index, id, name) or findCaseInsensitive(index, id, name)
-		if found then
-			return { entry = found, packageId = id, how = "global" }
-		end
-	end
-
-	return nil
+	return search(ids, true)
 end
 
 -- The package that owns a file, by longest matching directory prefix.
@@ -380,26 +322,7 @@ end
 -- Every *.spec.lua(u) file under a package's tree, sorted.
 function PackageIndex.specsOf(index: Index, pkgId: string): { string }
 	local pkg = index.packages[pkgId]
-	local found = {}
-	if not pkg or not pkg.treePath or not isDir(pkg.treePath) then
-		return found
-	end
-	local function walk(dir: string)
-		for _, entry in readDir(dir) do
-			if entry == "node_modules" or string.sub(entry, 1, 1) == "." then
-				continue
-			end
-			local path = dir .. "/" .. entry
-			if isDir(path) then
-				walk(path)
-			elseif string.match(entry, "%.spec%.luau?$") then
-				table.insert(found, path)
-			end
-		end
-	end
-	walk(pkg.treePath)
-	table.sort(found)
-	return found
+	return if pkg and pkg.treePath then Fs.findSpecs(pkg.treePath) else {}
 end
 
 return PackageIndex

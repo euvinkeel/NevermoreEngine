@@ -87,6 +87,19 @@ end
 function Expect.equals(a: any, b: any, strict: boolean?): boolean
 	return deepEqual(a, b, strict == true, {})
 end
+local equals = Expect.equals
+
+local function containsEqual(list: any, item: any): boolean
+	if type(list) ~= "table" then
+		return false
+	end
+	for _, value in list do
+		if equals(value, item) then
+			return true
+		end
+	end
+	return false
+end
 
 local function formatKey(key: any): string
 	if type(key) == "string" and string.match(key, "^[%a_][%w_]*$") then
@@ -214,17 +227,13 @@ function MATCHERS.toBe(ctx, expected)
 end
 
 function MATCHERS.toEqual(ctx, expected)
-	fail(
-		ctx,
-		deepEqual(ctx.actual, expected, false, {}),
-		`{Expect.format(ctx.actual)} to equal {Expect.format(expected)}`
-	)
+	fail(ctx, equals(ctx.actual, expected), `{Expect.format(ctx.actual)} to equal {Expect.format(expected)}`)
 end
 
 function MATCHERS.toStrictEqual(ctx, expected)
 	fail(
 		ctx,
-		deepEqual(ctx.actual, expected, true, {}),
+		equals(ctx.actual, expected, true),
 		`{Expect.format(ctx.actual)} to strictly equal {Expect.format(expected)}`
 	)
 end
@@ -301,16 +310,7 @@ function MATCHERS.toContain(ctx, item)
 end
 
 function MATCHERS.toContainEqual(ctx, item)
-	local pass = false
-	if type(ctx.actual) == "table" then
-		for _, value in ctx.actual do
-			if deepEqual(value, item, false, {}) then
-				pass = true
-				break
-			end
-		end
-	end
-	fail(ctx, pass, `{Expect.format(ctx.actual)} to contain equal {Expect.format(item)}`)
+	fail(ctx, containsEqual(ctx.actual, item), `{Expect.format(ctx.actual)} to contain equal {Expect.format(item)}`)
 end
 
 function MATCHERS.toHaveLength(ctx, length: number)
@@ -341,7 +341,7 @@ function MATCHERS.toHaveProperty(ctx, path: any, ...)
 		end
 		current = current[key]
 	end
-	local pass = found and (not hasValue or deepEqual(current, expected, false, {}))
+	local pass = found and (not hasValue or equals(current, expected))
 	fail(ctx, pass, `{Expect.format(ctx.actual)} to have property {Expect.format(path)}`)
 end
 
@@ -393,7 +393,7 @@ local function callMatches(call: any, expected: any): boolean
 		return false
 	end
 	for i = 1, expected.n or #expected do
-		if not deepEqual(call[i], expected[i], false, {}) then
+		if not equals(call[i], expected[i]) then
 			return false
 		end
 	end
@@ -476,7 +476,7 @@ local expect = setmetatable({
 				return false
 			end
 			for key, value in subset do
-				if not deepEqual(v[key], value, false, {}) then
+				if not equals(v[key], value) then
 					return false
 				end
 			end
@@ -485,22 +485,12 @@ local expect = setmetatable({
 	end,
 	arrayContaining = function(items: { any })
 		return asymmetric("ArrayContaining", function(v)
-			if type(v) ~= "table" then
-				return false
-			end
 			for _, item in items do
-				local found = false
-				for _, value in v do
-					if deepEqual(value, item, false, {}) then
-						found = true
-						break
-					end
-				end
-				if not found then
+				if not containsEqual(v, item) then
 					return false
 				end
 			end
-			return true
+			return type(v) == "table"
 		end)
 	end,
 }, {

@@ -30,24 +30,15 @@ local serde = require("@lune/serde")
 local task = require("@lune/task")
 
 local Expectations = require("./lib/Expectations")
+local Fs = require("./lib/Fs")
 local PackageIndex = require("./lib/PackageIndex")
+local RobloxApi = require("./lib/RobloxApi")
 
 local DEFAULT_ROOTS = { "@quenty/immediateutils", "@quenty/jecs", "@quenty/iris" }
 
 -- Arguments
 
-local options: { [string]: string } = {}
-local positional: { string } = {}
-for _, arg in process.args do
-	local key, value = string.match(arg, "^%-%-([%w%-]+)=(.*)$")
-	if key and value then
-		options[key] = value
-	elseif string.match(arg, "^%-%-[%w%-]+$") then
-		options[string.sub(arg, 3)] = "true"
-	else
-		table.insert(positional, arg)
-	end
-end
+local options, positional = Fs.parseArgs(process.args)
 
 local root = options.root or process.cwd
 root = string.gsub(root, "[/\\]+$", "")
@@ -64,17 +55,11 @@ local lune = process.env.LUNE or "lune"
 local quiet = options.quiet == "true"
 
 local function relative(path: string): string
-	if string.sub(path, 1, #root + 1) == root .. "/" then
-		return string.sub(path, #root + 2)
-	end
-	return path
+	return Fs.relative(root, path)
 end
 
 local function absolute(path: string): string
-	if string.sub(path, 1, 1) == "/" or string.match(path, "^%a:[/\\]") then
-		return path
-	end
-	return root .. "/" .. path
+	return Fs.absolute(root, path)
 end
 
 local started = os.clock()
@@ -147,23 +132,7 @@ elseif options.package or #positional > 0 then
 				addPackage(id)
 			elseif fs.isDir(path) then
 				-- A plain directory outside src/ (e.g. experiments/): every spec file under it.
-				local found = {}
-				local function walk(dir: string)
-					local entries = fs.readDir(dir)
-					table.sort(entries)
-					for _, entry in entries do
-						local child = dir .. "/" .. entry
-						if entry ~= "node_modules" and string.sub(entry, 1, 1) ~= "." then
-							if fs.isDir(child) then
-								walk(child)
-							elseif string.match(entry, "%.spec%.luau?$") then
-								table.insert(found, child)
-							end
-						end
-					end
-				end
-				walk(path)
-				for _, spec in found do
+				for _, spec in Fs.findSpecs(path) do
 					addSpec(spec)
 				end
 			else
@@ -195,6 +164,9 @@ end
 if #specs == 0 then
 	print("No specs selected.")
 	process.exit(0)
+elseif level == "datamodel" and not Fs.isFile(root .. "/globalTypes.d.lua") then
+	print(RobloxApi.MISSING)
+	process.exit(1)
 end
 
 -- Running
@@ -220,14 +192,9 @@ local function runOne(spec: string): SpecResult
 		"--index=" .. indexPath,
 		"--level=" .. level,
 	}
-	for _, key in { "test-timeout", "filter", "realm", "signals" } do
+	for _, key in { "test-timeout", "filter", "realm", "signals", "running", "studio" } do
 		if options[key] then
 			table.insert(workerArgs, `--{key}={options[key]}`)
-		end
-	end
-	for _, flag in { "detail", "running", "studio" } do
-		if options[flag] == "true" then
-			table.insert(workerArgs, "--" .. flag)
 		end
 	end
 

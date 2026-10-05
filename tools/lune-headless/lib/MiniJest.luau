@@ -21,15 +21,14 @@ type Mode = "run" | "skip" | "only" | "todo"
 
 type Hook = { fn: (...any) -> ...any, timeout: number? }
 
+type Hooks = { beforeAll: { Hook }, afterAll: { Hook }, beforeEach: { Hook }, afterEach: { Hook } }
+
 type Block = {
 	name: string,
 	parent: Block?,
 	children: { Node },
 	mode: Mode,
-	beforeAll: { Hook },
-	afterAll: { Hook },
-	beforeEach: { Hook },
-	afterEach: { Hook },
+	hooks: Hooks,
 	collectError: string?,
 }
 
@@ -61,18 +60,27 @@ export type Options = {
 
 local MAX_LOG_LINES = 50
 
+local HOOK_KINDS = { "beforeAll", "afterAll", "beforeEach", "afterEach" }
+
 local function newBlock(name: string, parent: Block?, mode: Mode): Block
 	return {
 		name = name,
 		parent = parent,
 		children = {},
 		mode = mode,
-		beforeAll = {},
-		afterAll = {},
-		beforeEach = {},
-		afterEach = {},
+		hooks = { beforeAll = {}, afterAll = {}, beforeEach = {}, afterEach = {} },
 		collectError = nil,
 	}
+end
+
+-- The names from the outermost describe block down to `block`.
+local function pathOf(block: Block?): { string }
+	local parts = {}
+	while block and block.parent do
+		table.insert(parts, 1, block.name)
+		block = block.parent
+	end
+	return parts
 end
 
 local function traceback(err: any): string
@@ -182,9 +190,9 @@ function MiniJest.new(options: Options): MiniJest
 		end
 	end
 
-	local function addHook(list: "beforeAll" | "afterAll" | "beforeEach" | "afterEach", fn: any, timeout: number?)
-		assertCollecting(list)
-		table.insert((current :: any)[list], { fn = fn, timeout = timeout })
+	local function addHook(kind: string, fn: any, timeout: number?)
+		assertCollecting(kind)
+		table.insert((current.hooks :: any)[kind], { fn = fn, timeout = timeout })
 	end
 
 	local it = callable(function(name, fn, timeout)
@@ -232,26 +240,20 @@ function MiniJest.new(options: Options): MiniJest
 	jestObject.useRealTimers = chain(function()
 		scheduler:useRealTimers()
 	end)
-	jestObject.advanceTimersByTime = function(ms: number)
-		scheduler:advanceTimersByTime(ms)
-	end
-	jestObject.runAllTimers = function()
-		scheduler:runAllTimers()
-	end
-	jestObject.runOnlyPendingTimers = function()
-		scheduler:runOnlyPendingTimers()
-	end
-	jestObject.advanceTimersToNextTimer = function(steps: number?)
-		scheduler:advanceTimersToNextTimer(steps)
-	end
-	jestObject.clearAllTimers = function()
-		scheduler:clearAllTimers()
-	end
-	jestObject.getTimerCount = function()
-		return scheduler:getTimerCount()
-	end
-	jestObject.setSystemTime = function(now: any?)
-		scheduler:setSystemTime(now)
+	for _, name in
+		{
+			"advanceTimersByTime",
+			"runAllTimers",
+			"runOnlyPendingTimers",
+			"advanceTimersToNextTimer",
+			"clearAllTimers",
+			"getTimerCount",
+			"setSystemTime",
+		}
+	do
+		jestObject[name] = function(...)
+			return (scheduler :: any)[name](scheduler, ...)
+		end
 	end
 	jestObject.now = function()
 		return scheduler.nowMs
@@ -268,19 +270,12 @@ function MiniJest.new(options: Options): MiniJest
 		fit = it.only,
 		expect = Expect.expect,
 		jest = jestObject,
-		beforeAll = function(fn, timeout)
-			addHook("beforeAll", fn, timeout)
-		end,
-		afterAll = function(fn, timeout)
-			addHook("afterAll", fn, timeout)
-		end,
-		beforeEach = function(fn, timeout)
-			addHook("beforeEach", fn, timeout)
-		end,
-		afterEach = function(fn, timeout)
-			addHook("afterEach", fn, timeout)
-		end,
 	}
+	for _, kind in HOOK_KINDS do
+		self.Globals[kind] = function(fn, timeout)
+			addHook(kind, fn, timeout)
+		end
+	end
 
 	-- Running
 
@@ -338,13 +333,13 @@ function MiniJest.new(options: Options): MiniJest
 	end
 
 	local function fullName(test: Test): string
-		local parts = { test.name }
-		local block: Block? = test.parent
-		while block and block.parent do
-			table.insert(parts, 1, block.name)
-			block = block.parent
-		end
+		local parts = pathOf(test.parent)
+		table.insert(parts, test.name)
 		return table.concat(parts, " > ")
+	end
+
+	local function runHook(hook: Hook): (boolean, string?)
+		return runAsync(hook.fn, hook.timeout or options.testTimeout)
 	end
 
 	local function effectiveMode(test: Test): Mode
@@ -392,16 +387,6 @@ function MiniJest.new(options: Options): MiniJest
 		table.insert(results, result)
 	end
 
-	local function blockPath(block: Block): string
-		local parts = {}
-		local b: Block? = block
-		while b and b.parent do
-			table.insert(parts, 1, b.name)
-			b = b.parent
-		end
-		return table.concat(parts, " > ")
-	end
-
 	local function runTest(test: Test, inheritedError: string?)
 		local name = fullName(test)
 		local mode = effectiveMode(test)
@@ -423,17 +408,14 @@ function MiniJest.new(options: Options): MiniJest
 			b = b.parent
 		end
 
-		if not err then
-			for _, block in chainBlocks do
-				for _, hook in block.beforeEach do
-					local ok, hookErr = runAsync(hook.fn, hook.timeout or options.testTimeout)
-					if not ok then
-						err = "beforeEach: " .. tostring(hookErr)
-						break
-					end
-				end
+		for _, block in chainBlocks do
+			for _, hook in block.hooks.beforeEach do
 				if err then
 					break
+				end
+				local ok, hookErr = runHook(hook)
+				if not ok then
+					err = "beforeEach: " .. tostring(hookErr)
 				end
 			end
 		end
@@ -446,8 +428,8 @@ function MiniJest.new(options: Options): MiniJest
 		end
 
 		for i = #chainBlocks, 1, -1 do
-			for _, hook in chainBlocks[i].afterEach do
-				local ok, hookErr = runAsync(hook.fn, hook.timeout or options.testTimeout)
+			for _, hook in chainBlocks[i].hooks.afterEach do
+				local ok, hookErr = runHook(hook)
 				if not ok and not err then
 					err = "afterEach: " .. tostring(hookErr)
 				end
@@ -466,32 +448,21 @@ function MiniJest.new(options: Options): MiniJest
 	end
 
 	local function runBlock(block: Block)
+		local path = table.concat(pathOf(block), " > ")
 		if block.collectError then
-			record({
-				name = blockPath(block) .. " [describe body]",
-				status = "failed",
-				durationMs = 0,
-				error = block.collectError,
-			})
+			record({ name = path .. " [describe body]", status = "failed", durationMs = 0, error = block.collectError })
 		end
 
-		if not hasRunnable(block) then
-			for _, node in block.children do
-				if node.kind == "test" then
-					runTest(node.test)
-				else
-					runBlock(node.block)
-				end
-			end
-			return
-		end
-
+		-- beforeAll and afterAll hooks run only around a block with a test that runs.
+		local runnable = hasRunnable(block)
 		local beforeAllError: string? = nil
-		for _, hook in block.beforeAll do
-			local ok, hookErr = runAsync(hook.fn, hook.timeout or options.testTimeout)
-			if not ok then
-				beforeAllError = "beforeAll: " .. tostring(hookErr)
-				break
+		if runnable then
+			for _, hook in block.hooks.beforeAll do
+				local ok, hookErr = runHook(hook)
+				if not ok then
+					beforeAllError = "beforeAll: " .. tostring(hookErr)
+					break
+				end
 			end
 		end
 
@@ -503,15 +474,17 @@ function MiniJest.new(options: Options): MiniJest
 			end
 		end
 
-		for _, hook in block.afterAll do
-			local ok, hookErr = runAsync(hook.fn, hook.timeout or options.testTimeout)
-			if not ok then
-				record({
-					name = (if block.parent then blockPath(block) .. " " else "") .. "[afterAll]",
-					status = "failed",
-					durationMs = 0,
-					error = "afterAll: " .. tostring(hookErr),
-				})
+		if runnable then
+			for _, hook in block.hooks.afterAll do
+				local ok, hookErr = runHook(hook)
+				if not ok then
+					record({
+						name = (if block.parent then path .. " " else "") .. "[afterAll]",
+						status = "failed",
+						durationMs = 0,
+						error = "afterAll: " .. tostring(hookErr),
+					})
+				end
 			end
 		end
 	end
