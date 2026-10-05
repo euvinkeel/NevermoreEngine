@@ -1,0 +1,47 @@
+{
+  "src/baseobject/src/Shared/BaseObject.lua": {
+    "type Instance": 2
+  },
+  "src/immediateutils/src/Shared/core/ImmediateCoreUtils.lua": {
+    "type Plugin": 2
+  },
+  "src/immediateutils/src/Shared/scheduler/ImmediateScheduler.lua": {
+    "type Instance": 1
+  },
+  "src/jecs/src/Shared/Immediate/hooks/JecsImmediateHookUtils.lua": {
+    "runtime Color3": 1,
+    "runtime Vector2": 1,
+    "runtime Vector3": 2,
+    "type Color3": 3,
+    "type Vector2": 1,
+    "type Vector3": 2
+  },
+  "src/jecs/src/Shared/Immediate/hooks/JecsImmediateHooksCoreHooks.lua": {
+    "runtime CFrame": 3,
+    "runtime Vector3": 2,
+    "type CFrame": 4,
+    "type RBXScriptSignal": 1
+  },
+  "src/loader/src/Maid.lua": {
+    "type Instance": 3,
+    "type RBXScriptConnection": 4
+  },
+  "src/maid/src/Shared/MaidTaskUtils.lua": {
+    "type Instance": 2,
+    "type RBXScriptConnection": 2
+  },
+  "src/promise/src/Shared/Promise.lua": {
+    "runtime game": 1,
+    "type HttpService": 2
+  },
+  "src/randomutils/src/Shared/RandomUtils.lua": {
+    "runtime Vector3": 1,
+    "type Vector3": 1
+  },
+  "src/rx/src/Shared/Rx.lua": {
+    "type RBXScriptSignal": 1
+  },
+  "src/servicebag/src/Shared/ServiceBag.lua": {
+    "type Instance": 2
+  }
+}
