@@ -40,8 +40,8 @@ The M5 target specs (attributeutils, instanceutils, tie, steputils, and the prom
 - **M3.** The Rx/Promise family is green. One source fix: Promise fetches HttpService lazily.
 - **M4.** `experiments/statuh-scope/`:
   - Design comparison, typed API stubs (15 must-fail lines), and a prototype. Reworked after the owner's answers: scope is permission only, VisibleThrough names an entity, and components can be narrower than their entity.
-  - 20 tests, and a 6,000-seed soak with 0 failures.
-  - Benchmark: ~3.7 ms/frame at 50 players × 2,000 entities.
+  - 22 tests, and a 6,000-seed soak with 0 failures.
+  - Benchmark: ~4–5 ms/frame at 50 players × 2,000 entities.
   - Six prototype bugs and six jecs bugs found by fuzzing. Each jecs bug has a repro and a tested workaround in `experiments/jecs-findings/`; per the owner, nothing goes to the jecs project.
 - **M5.** The `datamodel` level, built on Lune's reflection database plus the luau-lsp definitions, with unique EnumItems and frame-aligned waits. It also turned up four runner bugs that affected every level: `toBe` semantics, `tick()` resolution, yielding requires, and concurrent requires.
 - **M6.** The common hooks are split into a pure pack, a Roblox pack and a facade. The merge is flat and keeps `debug.info(3)` keying, which a spec verifies; it fails if a hook gets wrapped.
@@ -287,7 +287,25 @@ The owner answered the M4 questions (`QUESTIONS.md`, "Owner's answers"). What ch
   `JecsWorkarounds.luau` avoids all six: a safe delete, a remove-then-add retarget, an explicit remove-all, and an integrity check over jecs's bookkeeping. Evidence:
   - A random search checks jecs against a plain model after every operation. Plain jecs calls go wrong in 2,975 of 10,000 seeds; with the workarounds, in none.
   - The Statuh fuzz now runs through the workarounds and checks jecs's integrity every frame (invariant 0). It passes all 6,000 soak seeds. With plain jecs calls, 87 of 1,000 seeds fail, all at that check.
-  - `JecsWorkarounds.spec.luau` (14 tests) also asserts that each bug is still there, so a jecs upgrade that fixes one shows up as a failure.
+  - `JecsBugs.spec.luau` (14 tests) also asserts that each bug is still there, so a jecs upgrade that fixes one shows up as a failure.
+
+### Simplification pass
+
+Asked afterwards to simplify and unify concepts, I reworked the Statuh prototype and the jecs findings. Behavior is unchanged except for one generalization, noted below.
+
+- **One principal model in the Statuh core.** Rooms, owners, `Net.Public`, the `VisibleTo` override, scope rules and per-component visibility were six mechanisms with their own indexes. They're one now:
+  - a viewer holds principals (everyone, its player entity, its rooms, and per rule its keys);
+  - an entity is granted to some principals and may need some.
+
+  One index (who holds each principal, and which entities watch it) drives everything. The generalization: because players and rooms are both principals, an `Owner` or `VisibleTo` naming a room means its members.
+- **The client redacts its own references to an entity it loses,** as it already strips pairs, so the server sends fewer messages and has less to track.
+- **ENTER grouping, removal lists and unused API are simpler.**
+- **One shared reference walker** (`mapRefs`) replaces five copies.
+- **The test kit is smaller:** the oracle uses the same model, the fuzz world is table driven, and scenarios use a `spawn` helper.
+- **Two untested features got tests:** prediction pins with ROLLBACK, and default-public archetypes.
+- **jecs findings:** each bug is one scenario in `JecsBugs.luau`, run plain and through the workarounds. One spec and one `check.luau` replace six scripts, a spec and a search tool.
+
+Size: Statuh `src/` and `test/` went from 3,920 to 2,780 lines (the core from 1,795 to ~1,160), and jecs-findings from 966 lines in 13 files to 670 in 5. All 22 Statuh tests and 14 jecs tests pass, and the 6,000-seed soak has 0 failures. Mutating the core four ways (REM for HIDE, no re-evaluation when a viewer gains a principal, no reference fix-up, inheritance cut at the parent) fails the tests. The bench is 5–35% slower per frame than the first core, depending on the case; runs vary 10–15%, so part of that is noise. DESIGN.md is rewritten around the principal model.
 
 ## M5. Fake DataModel with events: `--level=datamodel`
 
